@@ -1,0 +1,29 @@
+name: optic
+description: "Optic: Axis Optic's developer app (feedback tickets from the Axis apps)."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.10.3
+
+dependencies:
+  flutter:
+    sdk: flutter
+  firebase_core: ^4.15.0
+  cloud_firestore: ^6.10.0
+  firebase_auth: ^6.7.0
+  firebase_messaging: ^16.7.0
+  cloud_functions: ^6.5.1
+  flutter_local_notifications: ^22.3.3
+  google_sign_in: ^7.2.0
+  http: ^1.6.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/optic_mark.png
+    # One rounded icon per app, named <service id>.png (tool/add_app_icon.py).
+    - assets/apps/

@@ -1,0 +1,49 @@
+{
+  "project_info": {
+    "project_number": "282213766426",
+    "firebase_url": "https://project-attendance-app-default-rtdb.firebaseio.com",
+    "project_id": "project-attendance-app",
+    "storage_bucket": "project-attendance-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:282213766426:android:b75bdac2b6baaf3c4848a3",
+        "android_client_info": {
+          "package_name": "com.axisoptic.optic"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAwo82eDOdSE2YPBAPGjRfu28HxUf1KRoE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:282213766426:android:a44298d501c15e714848a3",
+        "android_client_info": {
+          "package_name": "com.example.axis_ops"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAwo82eDOdSE2YPBAPGjRfu28HxUf1KRoE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
