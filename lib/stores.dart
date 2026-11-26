@@ -1,10 +1,10 @@
-// Stores data and models for Optic developer app.
+// Stores data and models for Console developer app.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 
-import 'firebase_options.dart';
+import 'team_firebase.dart';
 
 class StoreOwner {
   const StoreOwner({
@@ -73,7 +73,7 @@ Future<void> updateStoreFeature({
   required String featureKey,
   required bool enabled,
 }) async {
-  await FirebaseFirestore.instance
+  await teamDb
       .collection('stores')
       .doc(storeId)
       .collection('settings')
@@ -89,7 +89,7 @@ Future<void> updateStoreDevMode({
   required String storeId,
   required bool isDev,
 }) async {
-  await FirebaseFirestore.instance.collection('stores').doc(storeId).set({
+  await teamDb.collection('stores').doc(storeId).set({
     'is_dev': isDev,
     'updated_at': FieldValue.serverTimestamp(),
   }, SetOptions(merge: true));
@@ -115,13 +115,13 @@ Future<void> updateOwnerDetails({
   if (cleanFirst.isNotEmpty) updates['first_name'] = cleanFirst;
   if (cleanLast.isNotEmpty) updates['last_name'] = cleanLast;
 
-  await FirebaseFirestore.instance
+  await teamDb
       .collection('users')
       .doc(ownerUid)
       .set(updates, SetOptions(merge: true));
 
   // 2. Also update in /stores/{storeId}/users/{ownerUid} if it exists
-  final storeUserRef = FirebaseFirestore.instance
+  final storeUserRef = teamDb
       .collection('stores')
       .doc(storeId)
       .collection('users')
@@ -142,7 +142,7 @@ Future<void> updateOwnerDetails({
 /// Permanently deletes a store, cleans up its subcollections, and removes
 /// it from all owner records in Firestore.
 Future<void> deleteStore({required String storeId}) async {
-  final firestore = FirebaseFirestore.instance;
+  final firestore = teamDb;
   final storeDocRef = firestore.collection('stores').doc(storeId);
 
   // Subcollections to clean up under /stores/{storeId}
@@ -210,7 +210,7 @@ class CreateStoreResult {
 ///
 /// Supports having multiple owner accounts with the same email.
 /// Uses an isolated secondary FirebaseApp so the currently signed-in
-/// developer session in Optic is never interrupted or signed out.
+/// developer session in Console is never interrupted or signed out.
 Future<CreateStoreResult> createNewStoreWithOwner({
   required String storeTitle,
   required String ownerFirstName,
@@ -236,7 +236,7 @@ Future<CreateStoreResult> createNewStoreWithOwner({
   try {
     secondaryApp = await Firebase.initializeApp(
       name: secondaryAppName,
-      options: DefaultFirebaseOptions.currentPlatform,
+      options: kTeamOptions,
     );
 
     final creds = await FirebaseAuth.instanceFor(app: secondaryApp)
@@ -248,7 +248,7 @@ Future<CreateStoreResult> createNewStoreWithOwner({
   } on FirebaseAuthException catch (e) {
     if (e.code == 'email-already-in-use') {
       // 1 account per email: link store to existing owner account
-      final existingQuery = await FirebaseFirestore.instance
+      final existingQuery = await teamDb
           .collection('users')
           .where('email', isEqualTo: cleanEmail)
           .get();
@@ -273,15 +273,15 @@ Future<CreateStoreResult> createNewStoreWithOwner({
 
   // 2. Create the store document in /stores/{storeId}
   final storeRef = customStoreId != null && customStoreId.trim().isNotEmpty
-      ? FirebaseFirestore.instance.collection('stores').doc(customStoreId.trim())
-      : FirebaseFirestore.instance.collection('stores').doc();
+      ? teamDb.collection('stores').doc(customStoreId.trim())
+      : teamDb.collection('stores').doc();
   final storeId = storeRef.id;
 
   await storeRef.set({
     'name': cleanTitle,
     'is_dev': isDev,
     'created_at': FieldValue.serverTimestamp(),
-    'created_by': 'Optic Developer App',
+    'created_by': 'Console Developer App',
   });
 
   // 3. Create default global_config settings in /stores/{storeId}/settings/global_config
@@ -310,7 +310,7 @@ Future<CreateStoreResult> createNewStoreWithOwner({
   });
 
   // 4. Update or create global user record in /users/{ownerUid}
-  await FirebaseFirestore.instance.collection('users').doc(ownerUid).set({
+  await teamDb.collection('users').doc(ownerUid).set({
     'first_name': cleanFirst.isNotEmpty ? cleanFirst : 'Owner',
     'last_name': cleanLast,
     'email': cleanEmail,

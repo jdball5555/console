@@ -1,0 +1,14 @@
+{
+  "name": "axis-optic-functions",
+  "description": "Axis Optic: feedback from every Axis app, app alerts, and Console's user admin.",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "^7.4.0",
+    "google-auth-library": "^11.3.0"
+  }
+}

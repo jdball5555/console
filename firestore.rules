@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// Axis Optic (axis-optic-ce4f2): Console's data. Only developer logins can
+// read or change anything. The apps never touch this database directly; they
+// go through the Cloud Functions in functions/index.js, which check who's
+// calling.
+//
+//   developers/{uid}   one doc per developer login, added by hand in the
+//                      Firebase console (the doc can be empty)
+//   tickets/{id}       feedback from every Axis app (created by `feedback`)
+//   console/devices    phones that get Console's push notifications
+//   console/alerts     per-app alert switches
+//   console/activity   recent app events
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isDeveloper() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/developers/$(request.auth.uid));
+    }
+
+    match /developers/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /tickets/{ticketId} {
+      allow read, update, delete: if isDeveloper();
+      allow create: if false;
+    }
+
+    match /console/{doc} {
+      allow read, write: if isDeveloper();
+    }
+  }
+}

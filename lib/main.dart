@@ -1,4 +1,7 @@
-// Optic: Axis Optic's developer app.
+// Console: Axis Optic's developer app.
+//
+// Signs in to Axis Optic (tickets, alerts, user admin) with Google. Only
+// accounts with a developers/{uid} doc there get in.
 
 import 'dart:async';
 
@@ -8,16 +11,16 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import 'app_pages.dart';
 import 'firebase_options.dart';
+import 'google_data.dart';
 import 'notifications.dart';
 import 'services.dart';
+import 'team_firebase.dart';
+import 'theme.dart';
 import 'ticket_pages.dart';
-import 'tickets.dart';
-
-/// Logins that can use Optic (or set `developer: true` on /users/{uid}).
-const kDeveloperEmails = {'david@axisoptic.com', 'jdball0292@gmail.com'};
 
 final navigatorKey = GlobalKey<NavigatorState>();
 final messengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -30,36 +33,32 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: kBg,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await initTeamApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  runApp(const OpticApp());
+  runApp(const ConsoleApp());
 }
 
-class OpticApp extends StatelessWidget {
-  const OpticApp({super.key});
+class ConsoleApp extends StatelessWidget {
+  const ConsoleApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFF0B0B0D);
-    const card = Color(0xFF17171B);
-    final scheme = ColorScheme.fromSeed(
-      seedColor: kRed,
-      brightness: Brightness.dark,
-    ).copyWith(primary: kRed, surface: card);
     return MaterialApp(
-      title: 'Optic',
+      title: 'Console',
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
       scaffoldMessengerKey: messengerKey,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: scheme,
-        scaffoldBackgroundColor: bg,
-        cardColor: card,
-        dividerColor: const Color(0xFF26262C),
-        appBarTheme: const AppBarTheme(backgroundColor: bg, surfaceTintColor: Colors.transparent),
-        snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
-      ),
+      theme: buildConsoleTheme(),
+      themeMode: ThemeMode.dark,
       home: const AuthGate(),
     );
   }
@@ -86,11 +85,11 @@ class AuthGate extends StatelessWidget {
           future: _isDeveloper(user),
           builder: (context, dev) {
             if (!dev.hasData) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-            if (dev.data != true) return _NotDeveloper(email: user.email ?? user.uid);
+            if (dev.data != true) return _NotDeveloper(email: user.email ?? user.uid, uid: user.uid);
             final name = (user.displayName?.isNotEmpty == true) ? user.displayName! : 'David';
             return PushSetup(
               developerName: name,
-              child: OpticHomeScreen(developerName: name),
+              child: ConsoleHomeScreen(developerName: name),
             );
           },
         );
@@ -98,11 +97,16 @@ class AuthGate extends StatelessWidget {
     );
   }
 
+  /// A developer login has a developers/{uid} doc in Axis Optic (added by
+  /// hand in the Firebase console).
   static Future<bool> _isDeveloper(User user) async {
-    if (kDeveloperEmails.contains((user.email ?? '').toLowerCase())) return true;
     try {
-      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
-      return doc.data()?['developer'] == true;
+      final doc = await FirebaseFirestore.instance.collection('developers').doc(user.uid).get();
+      if (!doc.exists) return false;
+      // Axis Team's Stores tab needs Console signed in there too (no second
+      // login: Axis Team hands Console a token). Its pages open after this.
+      await connectTeam().timeout(const Duration(seconds: 15), onTimeout: () {});
+      return true;
     } catch (_) {
       return false;
     }
@@ -110,8 +114,9 @@ class AuthGate extends StatelessWidget {
 }
 
 class _NotDeveloper extends StatelessWidget {
-  const _NotDeveloper({required this.email});
+  const _NotDeveloper({required this.email, required this.uid});
   final String email;
+  final String uid;
 
   @override
   Widget build(BuildContext context) {
@@ -122,11 +127,21 @@ class _NotDeveloper extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.lock_outline_rounded, size: 40, color: Colors.white54),
-              const SizedBox(height: 12),
-              Text('$email isn\'t a developer login.', textAlign: TextAlign.center),
+              const Icon(Icons.lock_outline_rounded, size: 36, color: kTextFaint),
               const SizedBox(height: 16),
-              OutlinedButton(onPressed: FirebaseAuth.instance.signOut, child: const Text('Sign out')),
+              Text(
+                '$email isn\'t a developer login.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: kTextDim),
+              ),
+              const SizedBox(height: 8),
+              SelectableText(
+                'To let it in, add developers/$uid in Axis Optic\'s Firestore.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: kTextFaint, fontSize: 12.5),
+              ),
+              const SizedBox(height: 20),
+              OutlinedButton(onPressed: GoogleData.instance.signOut, child: const Text('Sign out')),
             ],
           ),
         ),
@@ -135,90 +150,16 @@ class _NotDeveloper extends StatelessWidget {
   }
 }
 
-/// Main shell: Tickets (every app's feedback) and Apps (one page per app).
-class OpticHomeScreen extends StatefulWidget {
-  const OpticHomeScreen({super.key, required this.developerName});
+/// Home is the Apps page; every app's tickets are one tap away in its header.
+class ConsoleHomeScreen extends StatelessWidget {
+  const ConsoleHomeScreen({super.key, required this.developerName});
   final String developerName;
 
   @override
-  State<OpticHomeScreen> createState() => _OpticHomeScreenState();
+  Widget build(BuildContext context) => AppsPage(developerName: developerName);
 }
 
-class _OpticHomeScreenState extends State<OpticHomeScreen> {
-  int _currentIndex = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          TicketsPage(developerName: widget.developerName),
-          AppsPage(developerName: widget.developerName),
-        ],
-      ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF141418),
-          border: Border(
-            top: BorderSide(color: Color(0xFF26262C), width: 0.8),
-          ),
-        ),
-        child: StreamBuilder<List<Ticket>>(
-          stream: allTickets(),
-          builder: (context, ticketsSnap) {
-            final openCount = (ticketsSnap.data ?? const <Ticket>[]).where((t) => t.isOpen).length;
-
-            Widget badged(IconData icon) => openCount > 0
-                ? Badge.count(count: openCount, backgroundColor: kRed, textColor: Colors.white, child: Icon(icon))
-                : Icon(icon);
-
-            return NavigationBarTheme(
-              data: NavigationBarThemeData(
-                height: 64,
-                backgroundColor: Colors.transparent,
-                indicatorColor: kRed.withValues(alpha: 0.2),
-                labelTextStyle: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) {
-                    return const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white);
-                  }
-                  return const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF8E8E93));
-                }),
-                iconTheme: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) {
-                    return const IconThemeData(color: kRed, size: 24);
-                  }
-                  return const IconThemeData(color: Color(0xFF8E8E93), size: 24);
-                }),
-              ),
-              child: NavigationBar(
-                selectedIndex: _currentIndex,
-                onDestinationSelected: (idx) {
-                  HapticFeedback.selectionClick();
-                  setState(() => _currentIndex = idx);
-                },
-                destinations: [
-                  NavigationDestination(
-                    icon: badged(Icons.confirmation_number_outlined),
-                    selectedIcon: badged(Icons.confirmation_number_rounded),
-                    label: 'Tickets',
-                  ),
-                  const NavigationDestination(
-                    icon: Icon(Icons.apps_outlined),
-                    selectedIcon: Icon(Icons.apps_rounded),
-                    label: 'Apps',
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-/// Saves this phone for Optic notifications and opens the ticket (or the app /
+/// Saves this phone for Console notifications and opens the ticket (or the app /
 /// user an alert is about) when one is tapped.
 class PushSetup extends StatefulWidget {
   const PushSetup({super.key, required this.child, this.developerName = 'Developer'});
@@ -249,7 +190,7 @@ class _PushSetupState extends State<PushSetup> {
     super.dispose();
   }
 
-  Future<void> _save(String token) => FirebaseFirestore.instance.collection('dev').doc('devices').set({
+  Future<void> _save(String token) => FirebaseFirestore.instance.collection('console').doc('devices').set({
     'tokens': FieldValue.arrayUnion([token]),
     'updated_at': FieldValue.serverTimestamp(),
   }, SetOptions(merge: true));
@@ -336,7 +277,7 @@ class _PushSetupState extends State<PushSetup> {
     final service = serviceById(m.data['service'] as String?) ?? serviceForApp('${m.data['app'] ?? ''}');
     final bug = m.data['ticket_type'] == 'Bug';
     final (pushTitle, body) = pushText(m);
-    final title = pushTitle.isNotEmpty ? pushTitle : (event ? 'Optic' : (bug ? 'New bug' : 'New improvement'));
+    final title = pushTitle.isNotEmpty ? pushTitle : (event ? 'Console' : (bug ? 'New bug' : 'New improvement'));
 
     late final OverlayEntry entry;
     entry = OverlayEntry(
@@ -344,7 +285,6 @@ class _PushSetupState extends State<PushSetup> {
         title: title,
         body: body,
         bug: bug,
-        accent: event ? service?.color : null,
         service: service,
         onTap: () {
           try {
@@ -376,7 +316,6 @@ class _InAppNotificationBanner extends StatefulWidget {
     required this.bug,
     required this.onTap,
     required this.onDismiss,
-    this.accent,
     this.service,
   });
 
@@ -384,11 +323,8 @@ class _InAppNotificationBanner extends StatefulWidget {
   final String body;
   final bool bug;
 
-  /// The app's color, for app alerts.
-  final Color? accent;
-
   /// The app it's about; its icon shows on the banner.
-  final OpticService? service;
+  final ConsoleService? service;
   final VoidCallback onTap;
   final VoidCallback onDismiss;
 
@@ -433,11 +369,10 @@ class _InAppNotificationBannerState extends State<_InAppNotificationBanner> with
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.paddingOf(context).top;
-    final accentColor = widget.accent ?? (widget.bug ? kRed : kBlue);
     return Positioned(
       top: topPadding + 8,
-      left: 14,
-      right: 14,
+      left: 12,
+      right: 12,
       child: Material(
         color: Colors.transparent,
         child: SlideTransition(
@@ -455,33 +390,27 @@ class _InAppNotificationBannerState extends State<_InAppNotificationBanner> with
                 }
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1B1B20),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: accentColor.withValues(alpha: 0.65), width: 1.5),
+                  color: kSurfaceHigh,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: kLine, width: 0.8),
                   boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.6),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
+                    BoxShadow(color: Colors.black.withValues(alpha: 0.7), blurRadius: 24, offset: const Offset(0, 10)),
                   ],
                 ),
                 child: Row(
                   children: [
                     if (widget.service case final s?)
-                      AppIcon(s, size: 36)
+                      AppIcon(s, size: 38)
                     else
                       Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: accentColor.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(color: kSurface, borderRadius: BorderRadius.circular(10)),
                         child: Icon(
-                          widget.bug ? Icons.bug_report_rounded : Icons.lightbulb_rounded,
-                          color: accentColor,
+                          widget.bug ? Icons.bug_report_outlined : Icons.lightbulb_outline_rounded,
+                          color: kText,
                           size: 20,
                         ),
                       ),
@@ -493,11 +422,9 @@ class _InAppNotificationBannerState extends State<_InAppNotificationBanner> with
                         children: [
                           Text(
                             widget.title,
-                            style: TextStyle(
-                              color: accentColor,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: kText, fontWeight: FontWeight.w600, fontSize: 14.5),
                           ),
                           if (widget.body.isNotEmpty) ...[
                             const SizedBox(height: 2),
@@ -505,7 +432,7 @@ class _InAppNotificationBannerState extends State<_InAppNotificationBanner> with
                               widget.body,
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white70, fontSize: 12.5),
+                              style: const TextStyle(color: kTextDim, fontSize: 13),
                             ),
                           ],
                         ],
@@ -513,18 +440,11 @@ class _InAppNotificationBannerState extends State<_InAppNotificationBanner> with
                     ),
                     const SizedBox(width: 10),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: accentColor,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      decoration: BoxDecoration(color: kText, borderRadius: BorderRadius.circular(99)),
                       child: const Text(
                         'Open',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: kBg, fontWeight: FontWeight.w600, fontSize: 12.5),
                       ),
                     ),
                   ],
@@ -550,17 +470,8 @@ class SignInPage extends StatefulWidget {
 }
 
 class _SignInPageState extends State<SignInPage> {
-  final _email = TextEditingController();
-  final _password = TextEditingController();
   bool _busy = false;
   String? _error;
-
-  @override
-  void dispose() {
-    _email.dispose();
-    _password.dispose();
-    super.dispose();
-  }
 
   Future<void> _signIn() async {
     setState(() {
@@ -568,15 +479,18 @@ class _SignInPageState extends State<SignInPage> {
       _error = null;
     });
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _email.text.trim(),
-        password: _password.text,
-      );
+      await GoogleData.instance.signIn();
+    } on GoogleSignInException catch (e) {
+      if (e.code != GoogleSignInExceptionCode.canceled) {
+        setState(() => _error = e.code == GoogleSignInExceptionCode.clientConfigurationError
+            ? 'Google sign-in isn\'t set up for Console yet (see the README).'
+            : (e.description ?? e.code.name));
+      }
     } on FirebaseAuthException catch (e) {
-      setState(() => _error = e.code == 'invalid-credential' || e.code == 'wrong-password' || e.code == 'user-not-found'
-          ? 'Wrong email or password.'
+      setState(() => _error = e.code == 'admin-restricted-operation'
+          ? 'New sign-ups are turned off for Axis Optic.'
           : (e.message ?? 'Couldn\'t sign in.'));
-    } catch (_) {
+    } catch (e) {
       setState(() => _error = 'Couldn\'t sign in. Check your connection.');
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -589,56 +503,43 @@ class _SignInPageState extends State<SignInPage> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(28),
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 400),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Center(child: Image.asset('assets/optic_mark.png', width: 96, height: 96)),
-                  const SizedBox(height: 14),
+                  Center(child: Image.asset('assets/optic_mark.png', width: 64, height: 64)),
+                  const SizedBox(height: 28),
                   const Text(
-                    'Optic',
+                    'Console',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+                    style: TextStyle(fontSize: 34, fontWeight: FontWeight.w300, letterSpacing: 6),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   const Text(
-                    'Axis Optic developer tools',
+                    'AXIS OPTIC DEVELOPER',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white54),
+                    style: TextStyle(color: kTextFaint, fontSize: 11.5, letterSpacing: 2.4),
                   ),
-                  const SizedBox(height: 32),
-                  TextField(
-                    controller: _email,
-                    keyboardType: TextInputType.emailAddress,
-                    autocorrect: false,
-                    decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _password,
-                    obscureText: true,
-                    onSubmitted: (_) => _signIn(),
-                    decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder()),
+                  const SizedBox(height: 48),
+                  FilledButton.icon(
+                    onPressed: _busy ? null : _signIn,
+                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+                    icon: _busy
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.account_circle_outlined),
+                    label: const Text('Sign in with Google'),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),
-                    Text(_error!, style: const TextStyle(color: kRed)),
+                    Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: kDanger, fontSize: 13)),
                   ],
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: _busy ? null : _signIn,
-                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                    child: _busy
-                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text('Sign in', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                  ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 18),
                   const Text(
-                    'Use your Axis Team login.',
+                    'Developer accounts only.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white38, fontSize: 13),
+                    style: TextStyle(color: kTextFaint, fontSize: 13),
                   ),
                 ],
               ),
@@ -649,5 +550,3 @@ class _SignInPageState extends State<SignInPage> {
     );
   }
 }
-
-

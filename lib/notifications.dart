@@ -1,7 +1,7 @@
-// Optic's phone notifications.
+// Console's phone notifications.
 //
 // Axis Team's functions send developer pushes as data messages (title, body,
-// color, service, ...) so Optic draws them itself: the Optic mark as the small
+// color, service, ...) so Console draws them itself: the Console mark as the small
 // icon, and the app the alert is about (assets/apps/<service>.png) on the
 // right. Older pushes with a `notification` block are still shown by Android.
 
@@ -17,12 +17,12 @@ import 'services.dart';
 final _plugin = FlutterLocalNotificationsPlugin();
 bool _ready = false;
 
-const _channelId = 'optic_feedback_channel';
-const _channelName = 'Optic alerts';
+const _channelId = 'console_alerts';
+const _channelName = 'Console alerts';
 const _smallIcon = '@drawable/ic_notification';
 
 /// Sets up local notifications. [onTap] gets the push's data when one of
-/// Optic's notifications is tapped while Optic is running.
+/// Console's notifications is tapped while Console is running.
 Future<void> initNotifications({void Function(Map<String, dynamic> data)? onTap}) async {
   await _plugin.initialize(
     settings: const InitializationSettings(android: AndroidInitializationSettings(_smallIcon)),
@@ -34,7 +34,7 @@ Future<void> initNotifications({void Function(Map<String, dynamic> data)? onTap}
   _ready = true;
 }
 
-/// The data of the Optic notification that launched the app, if any.
+/// The data of the Console notification that launched the app, if any.
 Future<Map<String, dynamic>?> launchNotificationData() async {
   final details = await _plugin.getNotificationAppLaunchDetails();
   if (details == null || !details.didNotificationLaunchApp) return null;

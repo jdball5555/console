@@ -1,8 +1,9 @@
 // Your Google account's Firebase data, read-only: the projects you can see,
 // Google Analytics traffic for each, and how its Cloud Functions are doing.
 //
-// Optic asks Google for read-only access once (Apps → Google account) and
-// then calls Google's APIs directly with that access token:
+// You sign in to Console with your Google account; Google asks for read-only
+// access the first time it's needed, and Console then calls Google's APIs
+// directly with that access token:
 //   Firebase Management  projects, and each project's Analytics property
 //   Analytics Data       visitors, page views, top pages
 //   Cloud Monitoring     function calls and errors
@@ -10,9 +11,12 @@
 
 import 'dart:convert';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
+
+import 'team_firebase.dart';
 
 const kGoogleScopes = [
   'https://www.googleapis.com/auth/firebase.readonly',
@@ -69,12 +73,39 @@ class GoogleData extends ChangeNotifier {
     } on GoogleSignInException catch (e) {
       if (e.code != GoogleSignInExceptionCode.canceled) {
         error = e.code == GoogleSignInExceptionCode.clientConfigurationError
-            ? 'Google sign-in isn\'t set up for Optic yet (see the README).'
+            ? 'Google sign-in isn\'t set up for Console yet (see the README).'
             : (e.description ?? e.code.name);
       }
     } catch (e) {
       error = '$e';
     }
+    notifyListeners();
+  }
+
+  /// Signs in to Console (Axis Optic) with a Google account. That account is
+  /// then also the one the Traffic tab uses; Google asks for its read-only
+  /// access the first time Traffic needs it.
+  Future<void> signIn() async {
+    await start();
+    final account = await GoogleSignIn.instance.authenticate();
+    final idToken = account.authentication.idToken;
+    if (idToken == null) throw const GoogleDataException('Google didn\'t return a sign-in token.');
+    await FirebaseAuth.instance.signInWithCredential(GoogleAuthProvider.credential(idToken: idToken));
+    _account = account;
+    notifyListeners();
+  }
+
+  /// Signs out of Console and forgets the Google account on this phone.
+  Future<void> signOut() async {
+    try {
+      await GoogleSignIn.instance.signOut();
+    } catch (_) {}
+    _account = null;
+    _token = null;
+    try {
+      await teamAuth.signOut();
+    } catch (_) {}
+    await FirebaseAuth.instance.signOut();
     notifyListeners();
   }
 

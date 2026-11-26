@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Adds an app's icon to Optic as a rounded square.
+"""Adds an app's icon to Console as a rounded square.
 
     python3 tool/add_app_icon.py <service id> <path to the app's square icon>
 
 Writes assets/apps/<service id>.png (256x256, rounded corners, transparent
-outside). Optic uses it on the Apps page, the app's page, in-app banners and
+outside). Console uses it on the Apps page, the app's page, in-app banners and
 on the right side of that app's notifications. `service id` is the `id` of the
-app's OpticService in lib/services.dart.
+app's ConsoleService in lib/services.dart.
 """
 
 import sys

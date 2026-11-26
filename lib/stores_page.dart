@@ -1,4 +1,4 @@
-// Stores management and feature configuration page for Optic.
+// Stores management and feature configuration page for Console.
 
 import 'dart:async';
 
@@ -8,15 +8,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'store_takeout_service.dart';
+import 'team_firebase.dart';
 import 'stores.dart';
 import 'ticket_pages.dart';
-import 'tickets.dart';
+import 'theme.dart';
 
 class StoresPage extends StatefulWidget {
   const StoresPage({super.key, required this.developerName, this.embedded = false});
   final String developerName;
 
-  /// Shown inside the Axis Team app page: no Optic header.
+  /// Shown inside the Axis Team app page: no Console header.
   final bool embedded;
 
   @override
@@ -71,15 +72,15 @@ class _StoresPageState extends State<StoresPage> {
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _openCreateStorePage,
-        backgroundColor: kRed,
-        foregroundColor: Colors.white,
+        backgroundColor: kText,
+        foregroundColor: kBg,
         icon: const Icon(Icons.add_business_rounded, size: 20),
         label: const Text('New Store', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: SafeArea(
         top: !widget.embedded,
         child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance.collection('stores').snapshots(),
+          stream: teamDb.collection('stores').snapshots(),
           builder: (context, storesSnap) {
             if (storesSnap.hasError) {
               return Center(
@@ -87,14 +88,14 @@ class _StoresPageState extends State<StoresPage> {
                   padding: const EdgeInsets.all(24),
                   child: Text(
                     'Failed to load stores: ${storesSnap.error}',
-                    style: const TextStyle(color: kRed),
+                    style: const TextStyle(color: kDanger),
                   ),
                 ),
               );
             }
 
             return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirebaseFirestore.instance.collection('users').snapshots(),
+              stream: teamDb.collection('users').snapshots(),
               builder: (context, usersSnap) {
                 if (!storesSnap.hasData || !usersSnap.hasData) {
                   return const Center(child: CircularProgressIndicator());
@@ -131,7 +132,7 @@ class _StoresPageState extends State<StoresPage> {
                                 'Stores',
                                 style: TextStyle(
                                   fontSize: 26,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
@@ -182,19 +183,19 @@ class _StoresPageState extends State<StoresPage> {
                                   )
                                 : null,
                             filled: true,
-                            fillColor: const Color(0xFF17171C),
+                            fillColor: kSurface,
                             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: Color(0xFF26262E)),
+                              borderSide: const BorderSide(color: kLine),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: Color(0xFF26262E)),
+                              borderSide: const BorderSide(color: kLine),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: kRed, width: 1.5),
+                              borderSide: const BorderSide(color: kText, width: 1),
                             ),
                           ),
                         ),
@@ -218,7 +219,7 @@ class _StoresPageState extends State<StoresPage> {
                               _FilterChip(
                                 label: 'Dev Mode ($devCount)',
                                 icon: Icons.developer_mode_rounded,
-                                color: const Color(0xFFBA68C8),
+                                color: kText,
                                 selected: _filter == _StoreFilter.devOnly,
                                 onTap: () => setState(() => _filter = _StoreFilter.devOnly),
                               ),
@@ -226,7 +227,7 @@ class _StoresPageState extends State<StoresPage> {
                               _FilterChip(
                                 label: 'Schedule ON',
                                 icon: Icons.calendar_month_rounded,
-                                color: kGreen,
+                                color: kText,
                                 selected: _filter == _StoreFilter.scheduleOn,
                                 onTap: () => setState(() => _filter = _StoreFilter.scheduleOn),
                               ),
@@ -234,7 +235,7 @@ class _StoresPageState extends State<StoresPage> {
                               _FilterChip(
                                 label: 'Shifts ON',
                                 icon: Icons.swap_horiz_rounded,
-                                color: kBlue,
+                                color: kText,
                                 selected: _filter == _StoreFilter.shiftsOn,
                                 onTap: () => setState(() => _filter = _StoreFilter.shiftsOn),
                               ),
@@ -335,11 +336,11 @@ class _FilterChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final activeColor = color ?? Colors.white;
     return Material(
-      color: selected ? activeColor.withValues(alpha: 0.16) : const Color(0xFF17171C),
+      color: selected ? activeColor.withValues(alpha: 0.16) : kSurface,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
         side: BorderSide(
-          color: selected ? activeColor.withValues(alpha: 0.7) : const Color(0xFF26262E),
+          color: selected ? activeColor.withValues(alpha: 0.7) : kLine,
           width: 1.2,
         ),
       ),
@@ -406,7 +407,7 @@ class _StoreMetricsOverviewState extends State<_StoreMetricsOverview> {
     }
     for (final doc in widget.storeDocs) {
       if (!_subs.containsKey(doc.id)) {
-        _subs[doc.id] = FirebaseFirestore.instance
+        _subs[doc.id] = teamDb
             .collection('stores')
             .doc(doc.id)
             .collection('settings')
@@ -465,7 +466,7 @@ class _StoreMetricsOverviewState extends State<_StoreMetricsOverview> {
             label: 'Dev Mode',
             count: '$devCount',
             icon: Icons.developer_mode_rounded,
-            color: const Color(0xFFBA68C8),
+            color: kText,
           ),
         ),
         const SizedBox(width: 8),
@@ -474,7 +475,7 @@ class _StoreMetricsOverviewState extends State<_StoreMetricsOverview> {
             label: 'Schedule',
             count: '$scheduleCount',
             icon: Icons.calendar_month_rounded,
-            color: kGreen,
+            color: kText,
           ),
         ),
         const SizedBox(width: 8),
@@ -483,7 +484,7 @@ class _StoreMetricsOverviewState extends State<_StoreMetricsOverview> {
             label: 'Shifts',
             count: '$shiftCount',
             icon: Icons.swap_horiz_rounded,
-            color: kBlue,
+            color: kText,
           ),
         ),
       ],
@@ -509,9 +510,9 @@ class _MetricCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF17171C),
+        color: kSurface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF26262E)),
+        border: Border.all(color: kLine),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -522,7 +523,7 @@ class _MetricCard extends StatelessWidget {
               const Spacer(),
               Text(
                 count,
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: color),
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: color),
               ),
             ],
           ),
@@ -561,10 +562,10 @@ class _StoreCard extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         title: Row(
           children: [
-            const Icon(Icons.delete_forever_rounded, color: kRed, size: 24),
+            const Icon(Icons.delete_forever_rounded, color: kDanger, size: 24),
             const SizedBox(width: 10),
             Expanded(
-              child: Text('Delete "$sName"?', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+              child: Text('Delete "$sName"?', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
             ),
           ],
         ),
@@ -580,7 +581,7 @@ class _StoreCard extends StatelessWidget {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: kRed,
+              backgroundColor: kDanger,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -599,7 +600,7 @@ class _StoreCard extends StatelessWidget {
           context,
           'Store "$sName" deleted',
           icon: Icons.delete_outline_rounded,
-          color: kRed,
+          color: kDanger,
         );
       }
     } catch (e) {
@@ -608,7 +609,7 @@ class _StoreCard extends StatelessWidget {
           context,
           'Failed to delete store: $e',
           icon: Icons.error_outline_rounded,
-          color: kRed,
+          color: kDanger,
         );
       }
     }
@@ -621,7 +622,7 @@ class _StoreCard extends StatelessWidget {
     }
 
     return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
+      stream: teamDb
           .collection('stores')
           .doc(storeId)
           .collection('settings')
@@ -639,7 +640,7 @@ class _StoreCard extends StatelessWidget {
         }
 
         return Material(
-          color: const Color(0xFF17171C),
+          color: kSurface,
           borderRadius: BorderRadius.circular(16),
           child: InkWell(
             borderRadius: BorderRadius.circular(16),
@@ -659,7 +660,7 @@ class _StoreCard extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: isDev ? const Color(0xFFBA68C8).withValues(alpha: 0.35) : const Color(0xFF26262E),
+                  color: isDev ? kText.withValues(alpha: 0.35) : kLine,
                 ),
               ),
               child: Column(
@@ -673,14 +674,14 @@ class _StoreCard extends StatelessWidget {
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: isDev
-                              ? const Color(0xFF9C27B0).withValues(alpha: 0.18)
+                              ? kText.withValues(alpha: 0.18)
                               : Colors.white.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
                           isDev ? Icons.developer_mode_rounded : Icons.storefront_rounded,
                           size: 20,
-                          color: isDev ? const Color(0xFFCE93D8) : Colors.white,
+                          color: isDev ? kText : Colors.white,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -702,10 +703,10 @@ class _StoreCard extends StatelessWidget {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFF9C27B0).withValues(alpha: 0.22),
+                                      color: kText.withValues(alpha: 0.22),
                                       borderRadius: BorderRadius.circular(6),
                                       border: Border.all(
-                                        color: const Color(0xFFBA68C8).withValues(alpha: 0.7),
+                                        color: kText.withValues(alpha: 0.7),
                                       ),
                                     ),
                                     child: const Text(
@@ -713,7 +714,7 @@ class _StoreCard extends StatelessWidget {
                                       style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w900,
-                                        color: Color(0xFFCE93D8),
+                                        color: kText,
                                         letterSpacing: 0.5,
                                       ),
                                     ),
@@ -752,7 +753,7 @@ class _StoreCard extends StatelessWidget {
                                       ? 'Takeout exported: $count members saved to Downloads & copied to clipboard!'
                                       : 'Takeout exported: $count members copied to clipboard!',
                                   icon: Icons.check_circle_rounded,
-                                  color: kGreen,
+                                  color: kText,
                                 );
                               }
                             } catch (e) {
@@ -761,7 +762,7 @@ class _StoreCard extends StatelessWidget {
                                   context,
                                   'Takeout failed: $e',
                                   icon: Icons.error_outline_rounded,
-                                  color: kRed,
+                                  color: kDanger,
                                 );
                               }
                             }
@@ -772,7 +773,7 @@ class _StoreCard extends StatelessWidget {
                             value: 'takeout',
                             child: Row(
                               children: [
-                                Icon(Icons.file_download_outlined, color: kBlue, size: 18),
+                                Icon(Icons.file_download_outlined, color: kText, size: 18),
                                 SizedBox(width: 8),
                                 Text('Takeout Data (CSV)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
                               ],
@@ -782,9 +783,9 @@ class _StoreCard extends StatelessWidget {
                             value: 'delete',
                             child: Row(
                               children: [
-                                Icon(Icons.delete_outline_rounded, color: kRed, size: 18),
+                                Icon(Icons.delete_outline_rounded, color: kDanger, size: 18),
                                 SizedBox(width: 8),
-                                Text('Delete Store', style: TextStyle(color: kRed, fontWeight: FontWeight.w600)),
+                                Text('Delete Store', style: TextStyle(color: kDanger, fontWeight: FontWeight.w600)),
                               ],
                             ),
                           ),
@@ -796,7 +797,7 @@ class _StoreCard extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 12),
-                  const Divider(color: Color(0xFF23232A), height: 1),
+                  const Divider(color: kSurfaceHigh, height: 1),
                   const SizedBox(height: 12),
 
                   // Owner Row
@@ -805,7 +806,7 @@ class _StoreCard extends StatelessWidget {
                       Icon(
                         Icons.person_rounded,
                         size: 15,
-                        color: owners.isNotEmpty ? Colors.white70 : Colors.amber,
+                        color: owners.isNotEmpty ? Colors.white70 : kTextDim,
                       ),
                       const SizedBox(width: 6),
                       Expanded(
@@ -815,7 +816,7 @@ class _StoreCard extends StatelessWidget {
                               : 'No owner assigned',
                           style: TextStyle(
                             fontSize: 12.5,
-                            color: owners.isNotEmpty ? Colors.white70 : Colors.amber.shade300,
+                            color: owners.isNotEmpty ? Colors.white70 : kTextDim,
                             fontWeight: FontWeight.w500,
                           ),
                           maxLines: 1,
@@ -836,19 +837,19 @@ class _StoreCard extends StatelessWidget {
                         label: 'Dev Mode',
                         enabled: isDev,
                         icon: Icons.developer_mode_rounded,
-                        activeColor: const Color(0xFFBA68C8),
+                        activeColor: kText,
                       ),
                       _FeaturePill(
                         label: 'Schedule',
                         enabled: settings.isScheduleEnabled,
                         icon: Icons.calendar_month_rounded,
-                        activeColor: kGreen,
+                        activeColor: kText,
                       ),
                       _FeaturePill(
                         label: 'Shift Board',
                         enabled: settings.isShiftBoardEnabled,
                         icon: Icons.swap_horiz_rounded,
-                        activeColor: kBlue,
+                        activeColor: kText,
                       ),
                     ],
                   ),
@@ -945,7 +946,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
               ? 'Exported $count members to $path & copied to clipboard!'
               : 'Exported $count members & copied to clipboard!',
           icon: Icons.check_circle_rounded,
-          color: kGreen,
+          color: kText,
         );
       }
     } catch (e) {
@@ -954,7 +955,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           context,
           'Takeout failed: $e',
           icon: Icons.error_outline_rounded,
-          color: kRed,
+          color: kDanger,
         );
       }
     } finally {
@@ -986,8 +987,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: newVal ? const Color(0xFFBA68C8) : kRed,
-              foregroundColor: Colors.white,
+              backgroundColor: newVal ? kText : kDanger,
+              foregroundColor: newVal ? kBg : kText,
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text('$action Dev Mode', style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -1010,7 +1011,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           context,
           'Developer Mode ${newVal ? "enabled" : "disabled"} for $storeName',
           icon: Icons.developer_mode_rounded,
-          color: const Color(0xFFBA68C8),
+          color: kText,
         );
       }
     } catch (e) {
@@ -1019,7 +1020,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           context,
           'Failed to update Developer Mode: $e',
           icon: Icons.error_outline_rounded,
-          color: kRed,
+          color: kDanger,
         );
       }
     } finally {
@@ -1054,8 +1055,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: newVal ? kGreen : kRed,
-              foregroundColor: Colors.black,
+              backgroundColor: newVal ? kText : kDanger,
+              foregroundColor: newVal ? kBg : kText,
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text('$action $featureTitle', style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -1079,7 +1080,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           context,
           '$featureTitle ${newVal ? "enabled" : "disabled"} for $storeName',
           icon: newVal ? Icons.check_circle_rounded : Icons.info_outline_rounded,
-          color: newVal ? kGreen : kAmber,
+          color: newVal ? kText : kTextDim,
         );
       }
     } catch (e) {
@@ -1088,7 +1089,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           context,
           'Failed to update $featureTitle: $e',
           icon: Icons.error_outline_rounded,
-          color: kRed,
+          color: kDanger,
         );
       }
     } finally {
@@ -1113,9 +1114,9 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           return AlertDialog(
             title: const Row(
               children: [
-                Icon(Icons.manage_accounts_rounded, size: 22, color: kRed),
+                Icon(Icons.manage_accounts_rounded, size: 22, color: kText),
                 SizedBox(width: 10),
-                Text('Edit Owner Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                Text('Edit Owner Details', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
               ],
             ),
             content: SingleChildScrollView(
@@ -1131,7 +1132,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                   if (localError != null) ...[
                     Text(
                       localError!,
-                      style: const TextStyle(fontSize: 12.5, color: kRed, fontWeight: FontWeight.w600),
+                      style: const TextStyle(fontSize: 12.5, color: kDanger, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 10),
                   ],
@@ -1141,7 +1142,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                     controller: firstController,
                     decoration: InputDecoration(
                       filled: true,
-                      fillColor: const Color(0xFF1B1B20),
+                      fillColor: kSurfaceHigh,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
@@ -1153,7 +1154,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                     controller: lastController,
                     decoration: InputDecoration(
                       filled: true,
-                      fillColor: const Color(0xFF1B1B20),
+                      fillColor: kSurfaceHigh,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
@@ -1166,7 +1167,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                     keyboardType: TextInputType.emailAddress,
                     decoration: InputDecoration(
                       filled: true,
-                      fillColor: const Color(0xFF1B1B20),
+                      fillColor: kSurfaceHigh,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     ),
@@ -1181,8 +1182,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
               ),
               FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: kRed,
-                  foregroundColor: Colors.white,
+                  backgroundColor: kText,
+                  foregroundColor: kBg,
                 ),
                 onPressed: () async {
                   final newEmail = emailController.text.trim();
@@ -1212,7 +1213,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                         context,
                         'Owner updated: $newFirst $newLast ($newEmail)',
                         icon: Icons.check_circle_rounded,
-                        color: kGreen,
+                        color: kText,
                       );
                     }
                   } catch (e) {
@@ -1221,7 +1222,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                         context,
                         'Failed to update owner: $e',
                         icon: Icons.error_outline_rounded,
-                        color: kRed,
+                        color: kDanger,
                       );
                     }
                   }
@@ -1241,10 +1242,10 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
       builder: (ctx) => AlertDialog(
         title: Row(
           children: [
-            const Icon(Icons.delete_forever_rounded, color: kRed, size: 24),
+            const Icon(Icons.delete_forever_rounded, color: kDanger, size: 24),
             const SizedBox(width: 10),
             Expanded(
-              child: Text('Delete "$storeName"?', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+              child: Text('Delete "$storeName"?', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
             ),
           ],
         ),
@@ -1260,7 +1261,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: kRed,
+              backgroundColor: kDanger,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -1281,7 +1282,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           context,
           'Store "$storeName" deleted',
           icon: Icons.delete_outline_rounded,
-          color: kRed,
+          color: kDanger,
         );
       }
     } catch (e) {
@@ -1291,7 +1292,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
           context,
           'Failed to delete store: $e',
           icon: Icons.error_outline_rounded,
-          color: kRed,
+          color: kDanger,
         );
       }
     }
@@ -1301,7 +1302,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.storeName, style: const TextStyle(fontWeight: FontWeight.w800)),
+        title: Text(widget.storeName, style: const TextStyle(fontWeight: FontWeight.w600)),
         actions: [
           IconButton(
             tooltip: 'Delete Store',
@@ -1311,14 +1312,14 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
         ],
       ),
       body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-        stream: FirebaseFirestore.instance.collection('stores').doc(widget.storeId).snapshots(),
+        stream: teamDb.collection('stores').doc(widget.storeId).snapshots(),
         builder: (context, storeSnap) {
           final storeData = storeSnap.data?.data() ?? const {};
           final currentStoreName = (storeData['name'] as String? ?? widget.storeName).trim();
           final isDev = storeData['is_dev'] == true || storeData['isDev'] == true;
 
           return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance
+            stream: teamDb
                 .collection('stores')
                 .doc(widget.storeId)
                 .collection('settings')
@@ -1334,10 +1335,10 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF17171C),
+                      color: kSurface,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: isDev ? const Color(0xFFBA68C8).withValues(alpha: 0.35) : const Color(0xFF26262E),
+                        color: isDev ? kText.withValues(alpha: 0.35) : kLine,
                       ),
                     ),
                     child: Column(
@@ -1349,14 +1350,14 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
                                 color: isDev
-                                    ? const Color(0xFF9C27B0).withValues(alpha: 0.2)
+                                    ? kText.withValues(alpha: 0.2)
                                     : Colors.white.withValues(alpha: 0.08),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
                                 isDev ? Icons.developer_mode_rounded : Icons.storefront_rounded,
                                 size: 26,
-                                color: isDev ? const Color(0xFFCE93D8) : Colors.white,
+                                color: isDev ? kText : Colors.white,
                               ),
                             ),
                             const SizedBox(width: 14),
@@ -1369,7 +1370,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                                       Flexible(
                                         child: Text(
                                           currentStoreName,
-                                          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+                                          style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600),
                                         ),
                                       ),
                                       if (isDev) ...[
@@ -1377,10 +1378,10 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                                         Container(
                                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFF9C27B0).withValues(alpha: 0.25),
+                                            color: kText.withValues(alpha: 0.25),
                                             borderRadius: BorderRadius.circular(6),
                                             border: Border.all(
-                                              color: const Color(0xFFBA68C8).withValues(alpha: 0.8),
+                                              color: kText.withValues(alpha: 0.8),
                                             ),
                                           ),
                                           child: const Text(
@@ -1388,7 +1389,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                                             style: TextStyle(
                                               fontSize: 10.5,
                                               fontWeight: FontWeight.w900,
-                                              color: Color(0xFFCE93D8),
+                                              color: kText,
                                               letterSpacing: 0.5,
                                             ),
                                           ),
@@ -1430,7 +1431,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
 
                   // Owner Information Card
                   StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: FirebaseFirestore.instance.collection('users').snapshots(),
+                    stream: teamDb.collection('users').snapshots(),
                     builder: (context, usersSnap) {
                       final liveOwners = usersSnap.hasData
                           ? findStoreOwners(widget.storeId, usersSnap.data!.docs)
@@ -1439,9 +1440,9 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                       return Container(
                         padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF17171C),
+                          color: kSurface,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF26262E)),
+                          border: Border.all(color: kLine),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1460,7 +1461,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                             if (liveOwners.isEmpty)
                               const Text(
                                 'No owner account linked yet',
-                                style: TextStyle(fontSize: 14, color: Colors.amber),
+                                style: TextStyle(fontSize: 14, color: kTextDim),
                               )
                             else
                               ...liveOwners.map((owner) => Padding(
@@ -1510,7 +1511,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
 
                   // Active Members Summary
                   StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: FirebaseFirestore.instance
+                    stream: teamDb
                         .collection('stores')
                         .doc(widget.storeId)
                         .collection('users')
@@ -1520,9 +1521,9 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                       return Container(
                         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF17171C),
+                          color: kSurface,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF26262E)),
+                          border: Border.all(color: kLine),
                         ),
                         child: Row(
                           children: [
@@ -1542,7 +1543,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                               ),
                               child: Text(
                                 '$count',
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white),
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white),
                               ),
                             ),
                           ],
@@ -1561,7 +1562,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                       children: [
                         Text(
                           'Feature Access & Modules',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                         SizedBox(height: 4),
                         Text(
@@ -1579,7 +1580,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                     title: 'Developer Mode',
                     subtitle: 'Enables developer tools on Axis Team ("Clear All", "Seed Sample Store Data") and unlocks testing buttons.',
                     icon: Icons.developer_mode_rounded,
-                    activeColor: const Color(0xFFBA68C8),
+                    activeColor: kText,
                     enabled: isDev,
                     busy: _saving,
                     onChanged: (val) => _toggleDevMode(
@@ -1595,7 +1596,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                     title: 'Schedule Module',
                     subtitle: 'Schedule builder, shift assignments, and published schedules for team members and managers.',
                     icon: Icons.calendar_month_rounded,
-                    activeColor: kGreen,
+                    activeColor: kText,
                     enabled: settings.isScheduleEnabled,
                     busy: _saving,
                     onChanged: (val) => _toggleFeature(
@@ -1613,7 +1614,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                     title: 'Shift Board & Trading',
                     subtitle: 'Allows team members to post shifts, request covers, and pick up available open shifts.',
                     icon: Icons.swap_horiz_rounded,
-                    activeColor: kBlue,
+                    activeColor: kText,
                     enabled: settings.isShiftBoardEnabled,
                     busy: _saving,
                     onChanged: (val) => _toggleFeature(
@@ -1630,9 +1631,9 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF17171C),
+                      color: kSurface,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF26262E)),
+                      border: Border.all(color: kLine),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1642,10 +1643,10 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: kBlue.withValues(alpha: 0.15),
+                                color: kText.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(10),
                               ),
-                              child: const Icon(Icons.download_rounded, color: kBlue, size: 22),
+                              child: const Icon(Icons.download_rounded, color: kText, size: 22),
                             ),
                             const SizedBox(width: 12),
                             const Expanded(
@@ -1672,7 +1673,7 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                           child: OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
                               foregroundColor: Colors.white,
-                              side: const BorderSide(color: Color(0xFF383842)),
+                              side: const BorderSide(color: kLine),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
@@ -1696,20 +1697,20 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                   Container(
                     padding: const EdgeInsets.all(18),
                     decoration: BoxDecoration(
-                      color: kRed.withValues(alpha: 0.08),
+                      color: kDanger.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: kRed.withValues(alpha: 0.25)),
+                      border: Border.all(color: kDanger.withValues(alpha: 0.25)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Row(
                           children: [
-                            Icon(Icons.warning_amber_rounded, size: 20, color: kRed),
+                            Icon(Icons.warning_amber_rounded, size: 20, color: kDanger),
                             SizedBox(width: 8),
                             Text(
                               'Danger Zone',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kRed),
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kDanger),
                             ),
                           ],
                         ),
@@ -1724,8 +1725,8 @@ class _StoreDetailPageState extends State<StoreDetailPage> {
                           height: 44,
                           child: OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: kRed,
-                              side: BorderSide(color: kRed.withValues(alpha: 0.5)),
+                              foregroundColor: kDanger,
+                              side: BorderSide(color: kDanger.withValues(alpha: 0.5)),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                             icon: const Icon(Icons.delete_forever_rounded, size: 18),
@@ -1768,7 +1769,7 @@ class _FeatureToggleTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0xFF17171C),
+      color: kSurface,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -1778,7 +1779,7 @@ class _FeatureToggleTile extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: enabled ? activeColor.withValues(alpha: 0.35) : const Color(0xFF26262E),
+              color: enabled ? activeColor.withValues(alpha: 0.35) : kLine,
               width: 1.2,
             ),
           ),
@@ -1815,8 +1816,6 @@ class _FeatureToggleTile extends StatelessWidget {
                   ),
                   Switch(
                     value: enabled,
-                    activeThumbColor: activeColor,
-                    activeTrackColor: activeColor.withValues(alpha: 0.35),
                     onChanged: busy ? null : onChanged,
                   ),
                 ],
@@ -1930,7 +1929,7 @@ class _CreateStorePageState extends State<CreateStorePage> {
             ? 'Store "$title" created and linked to owner $email!'
             : 'Store "$title" created with owner $email!',
         icon: Icons.check_circle_rounded,
-        color: kGreen,
+        color: kText,
       );
 
       // Open new store detail view
@@ -1970,9 +1969,9 @@ class _CreateStorePageState extends State<CreateStorePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create New Store', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+        title: const Text('Create New Store', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 18)),
         elevation: 0,
-        backgroundColor: const Color(0xFF101014),
+        backgroundColor: kBg,
       ),
       body: SafeArea(
         child: ListView(
@@ -1982,13 +1981,13 @@ class _CreateStorePageState extends State<CreateStorePage> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: kRed.withValues(alpha: 0.15),
+                  color: kDanger.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: kRed.withValues(alpha: 0.5)),
+                  border: Border.all(color: kDanger.withValues(alpha: 0.5)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline_rounded, size: 18, color: kRed),
+                    const Icon(Icons.error_outline_rounded, size: 18, color: kDanger),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
@@ -2011,10 +2010,10 @@ class _CreateStorePageState extends State<CreateStorePage> {
                 hintText: 'e.g. Atlanta Flagship, Store 104…',
                 prefixIcon: const Icon(Icons.storefront_rounded, size: 20),
                 filled: true,
-                fillColor: const Color(0xFF1B1B20),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2C2C34))),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2C2C34))),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kRed, width: 1.5)),
+                fillColor: kSurfaceHigh,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kLine)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kLine)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kText, width: 1)),
               ),
             ),
 
@@ -2032,10 +2031,10 @@ class _CreateStorePageState extends State<CreateStorePage> {
                       hintText: 'First Name',
                       prefixIcon: const Icon(Icons.person_outline_rounded, size: 20),
                       filled: true,
-                      fillColor: const Color(0xFF1B1B20),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2C2C34))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2C2C34))),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kRed, width: 1.5)),
+                      fillColor: kSurfaceHigh,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kLine)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kLine)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kText, width: 1)),
                     ),
                   ),
                 ),
@@ -2046,10 +2045,10 @@ class _CreateStorePageState extends State<CreateStorePage> {
                     decoration: InputDecoration(
                       hintText: 'Last Name',
                       filled: true,
-                      fillColor: const Color(0xFF1B1B20),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2C2C34))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2C2C34))),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kRed, width: 1.5)),
+                      fillColor: kSurfaceHigh,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kLine)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kLine)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kText, width: 1)),
                     ),
                   ),
                 ),
@@ -2068,10 +2067,10 @@ class _CreateStorePageState extends State<CreateStorePage> {
                 hintText: 'owner@example.com',
                 prefixIcon: const Icon(Icons.email_outlined, size: 20),
                 filled: true,
-                fillColor: const Color(0xFF1B1B20),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2C2C34))),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2C2C34))),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kRed, width: 1.5)),
+                fillColor: kSurfaceHigh,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kLine)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kLine)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kText, width: 1)),
               ),
             ),
 
@@ -2088,7 +2087,7 @@ class _CreateStorePageState extends State<CreateStorePage> {
                     padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                     child: Text(
                       'Generate Random',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kRed),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kDanger),
                     ),
                   ),
                 ),
@@ -2106,10 +2105,10 @@ class _CreateStorePageState extends State<CreateStorePage> {
                   onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                 ),
                 filled: true,
-                fillColor: const Color(0xFF1B1B20),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2C2C34))),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2C2C34))),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kRed, width: 1.5)),
+                fillColor: kSurfaceHigh,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kLine)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kLine)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: kText, width: 1)),
               ),
             ),
 
@@ -2119,14 +2118,14 @@ class _CreateStorePageState extends State<CreateStorePage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFF1F2430),
+                color: kSurfaceHigh,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF2E3B52)),
+                border: Border.all(color: kLine),
               ),
               child: const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF64B5F6)),
+                  Icon(Icons.info_outline_rounded, size: 18, color: kTextDim),
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -2144,9 +2143,9 @@ class _CreateStorePageState extends State<CreateStorePage> {
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFF17171C),
+                color: kSurface,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF26262E)),
+                border: Border.all(color: kLine),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2161,11 +2160,9 @@ class _CreateStorePageState extends State<CreateStorePage> {
                     title: const Text('Developer Mode', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
                     subtitle: const Text('Shows "Clear All" & test tools on Axis Team', style: TextStyle(fontSize: 11.5, color: Colors.white54)),
                     value: _isDev,
-                    activeThumbColor: const Color(0xFFBA68C8),
-                    activeTrackColor: const Color(0xFFBA68C8).withValues(alpha: 0.35),
                     onChanged: (val) => setState(() => _isDev = val),
                   ),
-                  const Divider(color: Color(0xFF26262E), height: 1),
+                  const Divider(color: kLine, height: 1),
 
                   // Schedule switch
                   SwitchListTile(
@@ -2174,11 +2171,9 @@ class _CreateStorePageState extends State<CreateStorePage> {
                     title: const Text('Schedule Module', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
                     subtitle: const Text('Enable shift builder and rota views', style: TextStyle(fontSize: 11.5, color: Colors.white54)),
                     value: _isScheduleEnabled,
-                    activeThumbColor: kGreen,
-                    activeTrackColor: kGreen.withValues(alpha: 0.35),
                     onChanged: (val) => setState(() => _isScheduleEnabled = val),
                   ),
-                  const Divider(color: Color(0xFF26262E), height: 1),
+                  const Divider(color: kLine, height: 1),
 
                   // Shift Board switch
                   SwitchListTile(
@@ -2187,8 +2182,6 @@ class _CreateStorePageState extends State<CreateStorePage> {
                     title: const Text('Shift Board & Trading', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600)),
                     subtitle: const Text('Enable open shift pickups and trades', style: TextStyle(fontSize: 11.5, color: Colors.white54)),
                     value: _isShiftBoardEnabled,
-                    activeThumbColor: kBlue,
-                    activeTrackColor: kBlue.withValues(alpha: 0.35),
                     onChanged: (val) => setState(() => _isShiftBoardEnabled = val),
                   ),
                 ],
@@ -2202,7 +2195,7 @@ class _CreateStorePageState extends State<CreateStorePage> {
               height: 50,
               child: FilledButton(
                 style: FilledButton.styleFrom(
-                  backgroundColor: kRed,
+                  backgroundColor: kText,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 onPressed: _submitting ? null : _submit,

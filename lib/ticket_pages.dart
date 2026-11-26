@@ -1,10 +1,10 @@
 // The ticket inbox and one ticket's conversation.
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'services.dart';
+import 'theme.dart';
 import 'tickets.dart';
 
 String _devName = 'Developer';
@@ -25,7 +25,7 @@ class TicketsPage extends StatefulWidget {
   /// Only this app's tickets (its `app` name, e.g. "Scorecards"). All when null.
   final String? app;
 
-  /// Shown inside an app's page: no Optic header.
+  /// Shown inside an app's page: no app bar.
   final bool embedded;
 
   @override
@@ -41,236 +41,132 @@ class _TicketsPageState extends State<TicketsPage> {
   Widget build(BuildContext context) {
     _devName = widget.developerName;
     return Scaffold(
-      body: SafeArea(
-        top: !widget.embedded,
-        child: StreamBuilder<List<Ticket>>(
-          stream: _stream,
-          builder: (context, snap) {
-            final app = widget.app?.toLowerCase();
-            final all = [
-              for (final t in snap.data ?? const <Ticket>[])
-                if (app == null || t.app.toLowerCase() == app) t,
-            ];
-            final open = all.where((t) => t.isOpen).toList();
-            final bugs = open.where((t) => t.isBug).length;
-            final ideas = open.length - bugs;
-            final shown = all.where((t) {
-              final inTab = switch (_tab) {
-                _Tab.open => t.isOpen,
-                _Tab.waiting => t.isClosed,
-                _Tab.done => t.isResolved,
-              };
-              final inKind = switch (_kind) {
-                _Kind.all => true,
-                _Kind.bugs => t.isBug,
-                _Kind.improvements => !t.isBug,
-              };
-              return inTab && inKind;
-            }).toList()
-              ..sort(compareTickets);
+      appBar: widget.embedded ? null : AppBar(title: const Text('All tickets')),
+      body: StreamBuilder<List<Ticket>>(
+        stream: _stream,
+        builder: (context, snap) {
+          final app = widget.app?.toLowerCase();
+          final all = [
+            for (final t in snap.data ?? const <Ticket>[])
+              if (app == null || t.app.toLowerCase() == app) t,
+          ];
+          final open = all.where((t) => t.isOpen).toList();
+          final bugs = open.where((t) => t.isBug).length;
+          final ideas = open.length - bugs;
+          final shown = all.where((t) {
+            final inTab = switch (_tab) {
+              _Tab.open => t.isOpen,
+              _Tab.waiting => t.isClosed,
+              _Tab.done => t.isResolved,
+            };
+            final inKind = switch (_kind) {
+              _Kind.all => true,
+              _Kind.bugs => t.isBug,
+              _Kind.improvements => !t.isBug,
+            };
+            return inTab && inKind;
+          }).toList()
+            ..sort(compareTickets);
 
-            return CustomScrollView(
-              slivers: [
-                if (!widget.embedded)
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 12, 0),
-                  sliver: SliverToBoxAdapter(
-                    child: Row(
-                      children: [
-                        Image.asset(
-                          'assets/optic_mark.png',
-                          width: 34,
-                          height: 34,
+          return CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                sliver: SliverToBoxAdapter(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _CountCard(
+                          count: bugs,
+                          label: bugs == 1 ? 'Open bug' : 'Open bugs',
+                          icon: Icons.bug_report_outlined,
+                          selected: _tab == _Tab.open && _kind == _Kind.bugs,
+                          onTap: () => setState(() {
+                            _tab = _Tab.open;
+                            _kind = _kind == _Kind.bugs ? _Kind.all : _Kind.bugs;
+                          }),
                         ),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Text(
-                            'Optic',
-                            style: TextStyle(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        PopupMenuButton<String>(
-                          icon: const Icon(Icons.more_vert_rounded),
-                          onSelected: (val) async {
-                            if (val == 'out') {
-                              await FirebaseAuth.instance.signOut();
-                            } else if (val == 'test') {
-                              try {
-                                await FirebaseFirestore.instance
-                                    .collection('notifications')
-                                    .add({
-                                      'type': 'feedback',
-                                      'ticket_type': 'Bug',
-                                      'ticket_path': '',
-                                      'title':
-                                          '🔴 Test Notification from Optic',
-                                      'body':
-                                          'Push notification delivery confirmed on your phone!',
-                                      'send_at': Timestamp.now(),
-                                      'status': 'scheduled',
-                                      'created_at':
-                                          FieldValue.serverTimestamp(),
-                                    });
-                                if (context.mounted) {
-                                  showTopToast(
-                                    context,
-                                    'Test notification queued! It should appear shortly.',
-                                  );
-                                }
-                              } catch (e) {
-                                if (context.mounted) {
-                                  showTopToast(
-                                    context,
-                                    'Failed to send test: $e',
-                                    icon: Icons.error_outline_rounded,
-                                    color: kRed,
-                                  );
-                                }
-                              }
-                            }
-                          },
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(
-                              value: 'test',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.notifications_active_outlined,
-                                    size: 18,
-                                  ),
-                                  SizedBox(width: 10),
-                                  Text('Test notification'),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(20, widget.embedded ? 14 : 18, 20, 0),
-                  sliver: SliverToBoxAdapter(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _CountCard(
-                            count: bugs,
-                            label: bugs == 1 ? 'open bug' : 'open bugs',
-                            color: kRed,
-                            icon: Icons.bug_report_rounded,
-                            selected: _tab == _Tab.open && _kind == _Kind.bugs,
-                            onTap: () => setState(() {
-                              _tab = _Tab.open;
-                              _kind = _kind == _Kind.bugs
-                                  ? _Kind.all
-                                  : _Kind.bugs;
-                            }),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _CountCard(
-                            count: ideas,
-                            label: ideas == 1 ? 'improvement' : 'improvements',
-                            color: kBlue,
-                            icon: Icons.lightbulb_rounded,
-                            selected:
-                                _tab == _Tab.open &&
-                                _kind == _Kind.improvements,
-                            onTap: () => setState(() {
-                              _tab = _Tab.open;
-                              _kind = _kind == _Kind.improvements
-                                  ? _Kind.all
-                                  : _Kind.improvements;
-                            }),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
-                  sliver: SliverToBoxAdapter(
-                    child: SegmentedButton<_Tab>(
-                      showSelectedIcon: false,
-                      segments: [
-                        ButtonSegment(
-                          value: _Tab.open,
-                          label: Text('Open (${open.length})'),
-                        ),
-                        ButtonSegment(
-                          value: _Tab.waiting,
-                          label: Text(
-                            'Closed (${all.where((t) => t.isClosed).length})',
-                          ),
-                        ),
-                        const ButtonSegment(
-                          value: _Tab.done,
-                          label: Text('Done'),
-                        ),
-                      ],
-                      selected: {_tab},
-                      onSelectionChanged: (s) => setState(() => _tab = s.first),
-                    ),
-                  ),
-                ),
-                if (_tab == _Tab.waiting)
-                  const SliverPadding(
-                    padding: EdgeInsets.fromLTRB(22, 6, 22, 0),
-                    sliver: SliverToBoxAdapter(
-                      child: Text(
-                        'You closed these. Waiting for the sender to agree or reopen.',
-                        style: TextStyle(color: Colors.white54, fontSize: 13),
                       ),
-                    ),
-                  ),
-                if (snap.hasError)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _Empty(
-                      icon: Icons.error_outline_rounded,
-                      text:
-                          'Tickets couldn\'t load. Check the Firestore rules for feedback.\n${snap.error}',
-                    ),
-                  )
-                else if (!snap.hasData)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (shown.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: _Empty(
-                      icon: Icons.inbox_rounded,
-                      text: _tab == _Tab.open
-                          ? (widget.app == null ? 'No open tickets. Nice.' : 'No open ${widget.app} tickets. Nice.')
-                          : 'Nothing here.',
-                    ),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
-                    sliver: SliverList.separated(
-                      itemCount: shown.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (context, i) => _TicketCard(
-                        ticket: shown[i],
-                        allTickets: shown,
-                        index: i,
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _CountCard(
+                          count: ideas,
+                          label: ideas == 1 ? 'Improvement' : 'Improvements',
+                          icon: Icons.lightbulb_outline_rounded,
+                          selected: _tab == _Tab.open && _kind == _Kind.improvements,
+                          onTap: () => setState(() {
+                            _tab = _Tab.open;
+                            _kind = _kind == _Kind.improvements ? _Kind.all : _Kind.improvements;
+                          }),
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                sliver: SliverToBoxAdapter(
+                  child: SegmentedButton<_Tab>(
+                    showSelectedIcon: false,
+                    segments: [
+                      ButtonSegment(value: _Tab.open, label: Text('Open ${open.length}')),
+                      ButtonSegment(
+                        value: _Tab.waiting,
+                        label: Text('Closed ${all.where((t) => t.isClosed).length}'),
+                      ),
+                      const ButtonSegment(value: _Tab.done, label: Text('Done')),
+                    ],
+                    selected: {_tab},
+                    onSelectionChanged: (s) => setState(() => _tab = s.first),
+                  ),
+                ),
+              ),
+              if (_tab == _Tab.waiting)
+                const SliverPadding(
+                  padding: EdgeInsets.fromLTRB(20, 8, 20, 0),
+                  sliver: SliverToBoxAdapter(
+                    child: Text(
+                      'You closed these. Waiting for the sender to agree or reopen.',
+                      style: TextStyle(color: kTextFaint, fontSize: 13),
                     ),
                   ),
-              ],
-            );
-          },
-        ),
+                ),
+              if (snap.hasError)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _Empty(
+                    icon: Icons.error_outline_rounded,
+                    text: 'Tickets couldn\'t load. Check the Firestore rules for feedback.\n${snap.error}',
+                  ),
+                )
+              else if (!snap.hasData)
+                const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                )
+              else if (shown.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _Empty(
+                    icon: Icons.inbox_outlined,
+                    text: _tab == _Tab.open
+                        ? (widget.app == null ? 'No open tickets.' : 'No open ${widget.app} tickets.')
+                        : 'Nothing here.',
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
+                  sliver: SliverList.separated(
+                    itemCount: shown.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, i) => _TicketCard(ticket: shown[i], allTickets: shown, index: i),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -280,57 +176,58 @@ class _CountCard extends StatelessWidget {
   const _CountCard({
     required this.count,
     required this.label,
-    required this.color,
     required this.icon,
     required this.selected,
     required this.onTap,
   });
   final int count;
   final String label;
-  final Color color;
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color.withValues(alpha: selected ? 0.22 : 0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(
-          color: color.withValues(alpha: selected ? 0.9 : 0.35),
-          width: selected ? 1.6 : 1,
-        ),
+    final fg = selected ? kBg : kText;
+    final dim = selected ? kBg.withValues(alpha: 0.6) : kTextDim;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      decoration: BoxDecoration(
+        color: selected ? kText : kSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: selected ? kText : kLine, width: 0.8),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: color),
-              const SizedBox(height: 10),
-              Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 34,
-                  height: 1,
-                  fontWeight: FontWeight.w800,
-                  color: color,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(icon, size: 16, color: dim),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: dim, fontSize: 13, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w600,
+                const SizedBox(height: 10),
+                Text(
+                  '$count',
+                  style: TextStyle(fontSize: 40, height: 1, fontWeight: FontWeight.w300, color: fg, letterSpacing: -1),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -348,9 +245,13 @@ class _TicketCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = ticket;
     final replies = t.replies;
+    final service = serviceForApp(t.app);
     return Material(
-      color: Theme.of(context).cardColor,
-      borderRadius: BorderRadius.circular(16),
+      color: kSurface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: kLine, width: 0.8),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => Navigator.of(context).push(
@@ -362,172 +263,61 @@ class _TicketCard extends StatelessWidget {
             ),
           ),
         ),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(width: 5, color: t.color),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(t.icon, size: 17, color: t.color),
-                          const SizedBox(width: 6),
-                          Text(
-                            t.typeLabel,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: t.color,
-                            ),
-                          ),
-                          if (t.reopenedCount > 0) ...[
-                            const SizedBox(width: 8),
-                            const _Pill('Reopened', color: kAmber),
-                          ],
-                          if (t.waitingOnMe && replies.isNotEmpty) ...[
-                            const SizedBox(width: 8),
-                            const _Pill('New reply', color: kAmber),
-                          ],
-                          const Spacer(),
-                          Text(
-                            timeAgo(t.updated),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.white54,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (serviceForApp(t.app) case final s?)
-                                  AppIcon(s, size: 14)
-                                else
-                                  const Icon(
-                                    Icons.language_rounded,
-                                    size: 12,
-                                    color: Colors.white60,
-                                  ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  t.app,
-                                  style: const TextStyle(
-                                    fontSize: 11.5,
-                                    color: Colors.white70,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (t.hasLocation)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: kBlue.withValues(alpha: 0.14),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: kBlue.withValues(alpha: 0.35),
-                                  width: 0.8,
-                                ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.place_outlined,
-                                    size: 12,
-                                    color: kBlue,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      maxWidth: 160,
-                                    ),
-                                    child: Text(
-                                      t.location,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 11.5,
-                                        color: kBlue,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        t.message,
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 15, height: 1.35),
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.person_outline_rounded,
-                            size: 15,
-                            color: Colors.white54,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: _SenderName(
-                              ticket: t,
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                color: Colors.white60,
-                              ),
-                            ),
-                          ),
-                          if (replies.isNotEmpty) ...[
-                            const Icon(
-                              Icons.chat_bubble_outline_rounded,
-                              size: 14,
-                              color: Colors.white54,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${replies.length}',
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                color: Colors.white60,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
+              Row(
+                children: [
+                  Icon(t.icon, size: 15, color: kTextDim),
+                  const SizedBox(width: 6),
+                  Text(
+                    t.typeLabel.toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.2,
+                      color: kTextDim,
+                    ),
                   ),
-                ),
+                  if (t.waitingOnMe && replies.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    const _Pill('New reply', filled: true),
+                  ],
+                  if (t.reopenedCount > 0) ...[
+                    const SizedBox(width: 6),
+                    const _Pill('Reopened'),
+                  ],
+                  const Spacer(),
+                  Text(timeAgo(t.updated), style: const TextStyle(fontSize: 12, color: kTextFaint)),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                t.message,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 15.5, height: 1.4, color: kText),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  if (service != null) ...[AppIcon(service, size: 16), const SizedBox(width: 6)],
+                  Expanded(
+                    child: _SenderName(
+                      ticket: t,
+                      prefix: [t.app, if (t.hasLocation) t.location].join(' · '),
+                      style: const TextStyle(fontSize: 12.5, color: kTextFaint),
+                    ),
+                  ),
+                  if (replies.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    const Icon(Icons.chat_bubble_outline_rounded, size: 13, color: kTextFaint),
+                    const SizedBox(width: 4),
+                    Text('${replies.length}', style: const TextStyle(fontSize: 12.5, color: kTextFaint)),
+                  ],
+                ],
               ),
             ],
           ),
@@ -539,9 +329,12 @@ class _TicketCard extends StatelessWidget {
 
 /// "Jane Smith · Store 121", looked up from their login for older tickets.
 class _SenderName extends StatelessWidget {
-  const _SenderName({required this.ticket, required this.style});
+  const _SenderName({required this.ticket, required this.style, this.prefix});
   final Ticket ticket;
   final TextStyle style;
+
+  /// Shown before the name, e.g. "Axis Team · Schedule".
+  final String? prefix;
 
   @override
   Widget build(BuildContext context) {
@@ -555,7 +348,11 @@ class _SenderName extends StatelessWidget {
           (t.storeId.isEmpty || t.storeId == 'all'
               ? null
               : 'Store ${t.storeId}');
-      return store == null ? who : '$who · $store';
+      return [
+        if (prefix != null && prefix!.isNotEmpty) prefix!,
+        who,
+        ?store,
+      ].join(' · ');
     }
 
     if (t.submitterName != null || t.submitterEmail != null) {
@@ -586,20 +383,23 @@ class _SenderName extends StatelessWidget {
 }
 
 class _Pill extends StatelessWidget {
-  const _Pill(this.label, {required this.color});
+  const _Pill(this.label, {this.filled = false});
   final String label;
-  final Color color;
+
+  /// White with black text, for things that need attention.
+  final bool filled;
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
     decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.16),
+      color: filled ? kText : Colors.transparent,
       borderRadius: BorderRadius.circular(99),
+      border: Border.all(color: filled ? kText : kLine),
     ),
     child: Text(
       label,
-      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: color),
+      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: filled ? kBg : kTextDim),
     ),
   );
 }
@@ -615,13 +415,9 @@ class _Empty extends StatelessWidget {
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: 40, color: Colors.white38),
-        const SizedBox(height: 10),
-        Text(
-          text,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: Colors.white54),
-        ),
+        Icon(icon, size: 32, color: kTextFaint),
+        const SizedBox(height: 12),
+        Text(text, textAlign: TextAlign.center, style: const TextStyle(color: kTextFaint)),
       ],
     ),
   );
@@ -687,7 +483,7 @@ class _TicketPageState extends State<TicketPage> {
           context,
           'Couldn\'t save: $e',
           icon: Icons.error_outline_rounded,
-          color: kRed,
+          color: kDanger,
         );
       }
     } finally {
@@ -707,17 +503,14 @@ class _TicketPageState extends State<TicketPage> {
           children: [
             const Text(
               'They\'ll see it\'s closed on their Feedback page and can agree or reopen it.',
-              style: TextStyle(color: Colors.white70),
+              style: TextStyle(color: kTextDim),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             TextField(
               controller: note,
               minLines: 2,
               maxLines: 5,
-              decoration: const InputDecoration(
-                hintText: 'What changed? (optional)',
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(hintText: 'What changed? (optional)'),
             ),
           ],
         ),
@@ -727,10 +520,6 @@ class _TicketPageState extends State<TicketPage> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: kGreen,
-              foregroundColor: Colors.black,
-            ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Close ticket'),
           ),
@@ -760,7 +549,7 @@ class _TicketPageState extends State<TicketPage> {
       } else {
         // Queue exhausted: immediately return to homepage
         Navigator.of(context).popUntil((route) => route.isFirst);
-        showTopToast(context, 'All open tickets closed! 🎉');
+        showTopToast(context, 'All open tickets closed');
       }
     } catch (e) {
       if (mounted) {
@@ -769,7 +558,7 @@ class _TicketPageState extends State<TicketPage> {
           context,
           'Couldn\'t close ticket: $e',
           icon: Icons.error_outline_rounded,
-          color: kRed,
+          color: kDanger,
         );
       }
     }
@@ -782,9 +571,7 @@ class _TicketPageState extends State<TicketPage> {
       stream: _currentRef.snapshots(),
       builder: (context, snap) {
         if (!snap.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: Center(child: CircularProgressIndicator(strokeWidth: 2)));
         }
         final t = Ticket(snap.data!);
         final statusLabel = t.isOpen
@@ -792,26 +579,15 @@ class _TicketPageState extends State<TicketPage> {
             : t.isClosed
             ? 'Closed · waiting on sender'
             : 'Done · sender agreed';
-        final statusColor = t.isOpen
-            ? (t.reopenedCount > 0 ? kAmber : t.color)
-            : kGreen;
+        final service = serviceForApp(t.app);
 
         return Scaffold(
           appBar: AppBar(
-            title: Row(
-              children: [
-                Icon(t.icon, color: t.color),
-                const SizedBox(width: 8),
-                Text(
-                  t.typeLabel,
-                  style: TextStyle(color: t.color, fontWeight: FontWeight.w800),
-                ),
-              ],
-            ),
+            title: Text(t.typeLabel),
             actions: [
               if (_queue.length > 1) ...[
                 IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_rounded, size: 16),
+                  icon: const Icon(Icons.chevron_left_rounded),
                   tooltip: 'Previous ticket',
                   onPressed: _currentIndex > 0
                       ? () => setState(() {
@@ -823,16 +599,12 @@ class _TicketPageState extends State<TicketPage> {
                 ),
                 Center(
                   child: Text(
-                    '${_currentIndex + 1} of ${_queue.length}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.white70,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    '${_currentIndex + 1}/${_queue.length}',
+                    style: const TextStyle(fontSize: 13, color: kTextDim, fontFeatures: [FontFeature.tabularFigures()]),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                  icon: const Icon(Icons.chevron_right_rounded),
                   tooltip: 'Next ticket',
                   onPressed: _currentIndex < _queue.length - 1
                       ? () => setState(() {
@@ -842,7 +614,7 @@ class _TicketPageState extends State<TicketPage> {
                         })
                       : null,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
               ],
             ],
           ),
@@ -850,138 +622,48 @@ class _TicketPageState extends State<TicketPage> {
             children: [
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
                   children: [
                     // The ticket.
+                    Row(
+                      children: [
+                        _Pill(statusLabel, filled: t.isOpen),
+                        const Spacer(),
+                        Text(timeAgo(t.created), style: const TextStyle(fontSize: 12.5, color: kTextFaint)),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    SelectableText(
+                      t.message,
+                      style: const TextStyle(fontSize: 19, height: 1.45, fontWeight: FontWeight.w400),
+                    ),
+                    const SizedBox(height: 20),
                     Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: t.color.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: t.color.withValues(alpha: 0.45),
-                        ),
-                      ),
+                      decoration: panelDecoration(radius: 14),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            children: [
-                              _Pill(statusLabel, color: statusColor),
-                              const Spacer(),
-                              Text(
-                                timeAgo(t.created),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white54,
-                                ),
-                              ),
-                            ],
+                          _MetaRow(
+                            label: 'App',
+                            leading: service == null ? null : AppIcon(service, size: 18),
+                            child: Text(t.app),
                           ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 9,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.09),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.language_rounded,
-                                      size: 14,
-                                      color: Colors.white70,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'App: ${t.app}',
-                                      style: const TextStyle(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (t.hasLocation)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 9,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: kBlue.withValues(alpha: 0.16),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: kBlue.withValues(alpha: 0.4),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.place_outlined,
-                                        size: 14,
-                                        color: kBlue,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'Location: ${t.location}',
-                                        style: const TextStyle(
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.w700,
-                                          color: kBlue,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          SelectableText(
-                            t.message,
-                            style: const TextStyle(fontSize: 16.5, height: 1.4),
-                          ),
-                          const SizedBox(height: 14),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.person_outline_rounded,
-                                size: 16,
-                                color: Colors.white54,
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: _SenderName(
-                                  ticket: t,
-                                  style: const TextStyle(color: Colors.white70),
-                                ),
-                              ),
-                            ],
+                          if (t.hasLocation) ...[
+                            const Divider(height: 1, indent: 14, endIndent: 14),
+                            _MetaRow(label: 'Location', child: Text(t.location)),
+                          ],
+                          const Divider(height: 1, indent: 14, endIndent: 14),
+                          _MetaRow(
+                            label: 'From',
+                            child: _SenderName(ticket: t, style: const TextStyle(color: kText)),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SectionLabel('Conversation'),
                     if (t.replies.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 8),
-                        child: Text(
-                          'No replies yet.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white38),
-                        ),
+                        child: Text('No replies yet.', textAlign: TextAlign.center, style: TextStyle(color: kTextFaint)),
                       ),
                     for (final r in t.replies) _Bubble(reply: r),
                   ],
@@ -989,17 +671,10 @@ class _TicketPageState extends State<TicketPage> {
               ),
               // Actions + reply box.
               Container(
-                padding: EdgeInsets.fromLTRB(
-                  12,
-                  10,
-                  12,
-                  10 + MediaQuery.paddingOf(context).bottom,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  border: Border(
-                    top: BorderSide(color: Theme.of(context).dividerColor),
-                  ),
+                padding: EdgeInsets.fromLTRB(12, 10, 12, 10 + MediaQuery.paddingOf(context).bottom),
+                decoration: const BoxDecoration(
+                  color: kBg,
+                  border: Border(top: BorderSide(color: kLine, width: 0.6)),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1014,34 +689,39 @@ class _TicketPageState extends State<TicketPage> {
                             maxLines: 5,
                             textCapitalization: TextCapitalization.sentences,
                             decoration: InputDecoration(
-                              hintText: 'Reply to them…',
-                              filled: true,
-                              fillColor: Colors.white.withValues(alpha: 0.05),
+                              hintText: 'Reply…',
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(22),
-                                borderSide: BorderSide.none,
+                                borderRadius: BorderRadius.circular(24),
+                                borderSide: const BorderSide(color: kLine),
                               ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(24),
+                                borderSide: const BorderSide(color: kLine),
                               ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(24),
+                                borderSide: const BorderSide(color: kTextDim),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         IconButton.filled(
+                          style: IconButton.styleFrom(
+                            backgroundColor: kText,
+                            foregroundColor: kBg,
+                            minimumSize: const Size(46, 46),
+                          ),
                           onPressed: _busy
                               ? null
                               : () {
                                   final text = _reply.text.trim();
                                   if (text.isEmpty) return;
                                   _reply.clear();
-                                  _run(
-                                    () => TicketWrites.reply(t, text, _devName),
-                                    'Reply sent.',
-                                  );
+                                  _run(() => TicketWrites.reply(t, text, _devName), 'Reply sent');
                                 },
-                          icon: const Icon(Icons.send_rounded),
+                          icon: const Icon(Icons.arrow_upward_rounded),
                         ),
                       ],
                     ),
@@ -1049,31 +729,15 @@ class _TicketPageState extends State<TicketPage> {
                     SizedBox(
                       width: double.infinity,
                       child: t.isOpen
-                          ? FilledButton.icon(
+                          ? FilledButton(
                               onPressed: _busy ? null : () => _close(t),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: kGreen,
-                                foregroundColor: Colors.black,
-                                minimumSize: const Size.fromHeight(48),
-                              ),
-                              icon: const Icon(Icons.check_circle_rounded),
-                              label: const Text(
-                                'Close ticket',
-                                style: TextStyle(fontWeight: FontWeight.w800),
-                              ),
+                              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                              child: const Text('Close ticket'),
                             )
-                          : OutlinedButton.icon(
-                              onPressed: _busy
-                                  ? null
-                                  : () => _run(
-                                      () => TicketWrites.reopen(t),
-                                      'Reopened.',
-                                    ),
-                              style: OutlinedButton.styleFrom(
-                                minimumSize: const Size.fromHeight(48),
-                              ),
-                              icon: const Icon(Icons.undo_rounded),
-                              label: const Text('Reopen'),
+                          : OutlinedButton(
+                              onPressed: _busy ? null : () => _run(() => TicketWrites.reopen(t), 'Reopened'),
+                              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
+                              child: const Text('Reopen'),
                             ),
                     ),
                   ],
@@ -1087,12 +751,36 @@ class _TicketPageState extends State<TicketPage> {
   }
 }
 
+class _MetaRow extends StatelessWidget {
+  const _MetaRow({required this.label, required this.child, this.leading});
+  final String label;
+  final Widget child;
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+    child: Row(
+      children: [
+        SizedBox(width: 78, child: Text(label, style: const TextStyle(color: kTextFaint, fontSize: 13.5))),
+        if (leading != null) ...[leading!, const SizedBox(width: 8)],
+        Expanded(
+          child: DefaultTextStyle.merge(
+            style: const TextStyle(fontSize: 14, color: kText),
+            child: child,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 /// Floating top notification toast so it never covers bottom action buttons.
 void showTopToast(
   BuildContext context,
   String message, {
-  IconData icon = Icons.check_circle_rounded,
-  Color color = kGreen,
+  IconData icon = Icons.check_rounded,
+  Color color = kText,
 }) {
   final overlay = Overlay.maybeOf(context, rootOverlay: true) ?? Overlay.maybeOf(context);
   if (overlay == null) return;
@@ -1185,12 +873,9 @@ class _TopToastWidgetState extends State<_TopToastWidget>
                   vertical: 12,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E222A),
+                  color: kSurfaceHigh,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: widget.color.withValues(alpha: 0.6),
-                    width: 1.2,
-                  ),
+                  border: Border.all(color: kLine, width: 0.8),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.5),
@@ -1207,8 +892,8 @@ class _TopToastWidgetState extends State<_TopToastWidget>
                       child: Text(
                         widget.message,
                         style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
+                          color: kText,
+                          fontWeight: FontWeight.w500,
                           fontSize: 14,
                         ),
                       ),
@@ -1234,41 +919,34 @@ class _Bubble extends StatelessWidget {
     return Align(
       alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.sizeOf(context).width * 0.8,
-        ),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-          decoration: BoxDecoration(
-            color: mine
-                ? kRed.withValues(alpha: 0.18)
-                : Colors.white.withValues(alpha: 0.07),
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(16),
-              topRight: const Radius.circular(16),
-              bottomLeft: Radius.circular(mine ? 16 : 4),
-              bottomRight: Radius.circular(mine ? 4 : 16),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${mine ? 'You' : (reply.name.isEmpty ? 'Them' : reply.name)} · ${timeAgo(reply.at)}',
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: Colors.white54,
-                  fontWeight: FontWeight.w600,
+        constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.8),
+        child: Column(
+          crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+              decoration: BoxDecoration(
+                color: mine ? kText : kSurfaceHigh,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(18),
+                  topRight: const Radius.circular(18),
+                  bottomLeft: Radius.circular(mine ? 18 : 4),
+                  bottomRight: Radius.circular(mine ? 4 : 18),
                 ),
               ),
-              const SizedBox(height: 4),
-              SelectableText(
+              child: SelectableText(
                 reply.text,
-                style: const TextStyle(fontSize: 15, height: 1.35),
+                style: TextStyle(fontSize: 15, height: 1.35, color: mine ? kBg : kText),
               ),
-            ],
-          ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(6, 4, 6, 12),
+              child: Text(
+                '${mine ? 'You' : (reply.name.isEmpty ? 'Them' : reply.name)} · ${timeAgo(reply.at)}',
+                style: const TextStyle(fontSize: 11.5, color: kTextFaint),
+              ),
+            ),
+          ],
         ),
       ),
     );

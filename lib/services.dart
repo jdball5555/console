@@ -1,25 +1,26 @@
-// The Axis apps Optic manages, and what each one's page shows.
+// The Axis apps Console manages, and what each one's page shows.
 //
 // Adding an app:
-//   1. Add an OpticService below. `name` must match the `app` field on its
-//      feedback tickets.
-//   2. Server side (only for apps in their own Firebase project): add it to
-//      EXTERNAL_APPS in axis-team/functions/index.js and give the app an
-//      optic.js (copy scorecards_app/functions/optic.js). Then set
-//      `remoteUsers: true` here and its Users tab works with no more Optic code.
-//   3. Alerts: list the alert keys its server sends (reportAppEvent's
+//   1. Add a ConsoleService below. `name` must match APPS in
+//      functions/index.js (it's the `app` field on its tickets).
+//   2. Server side: add its Firebase project to APPS in functions/index.js.
+//      For a Users tab, give the app a console.js (copy Scorecards'
+//      functions/console.js), set its adminUrl in APPS, and set
+//      `remoteUsers: true` here. No more Console code is needed.
+//   3. Feedback: the app posts to Axis Optic's `feedback` function.
+//   4. Alerts: list the alert keys its server sends (reportAppEvent's
 //      `event`). Feedback alerts come for free.
-//   4. Firebase project: set `projectId` for its Traffic tab.
-//   5. Icon: `python3 tool/add_app_icon.py <id> <the app's square icon>`.
-//      It's used in Optic and on the right of that app's notifications.
+//   5. Firebase project: set `projectId` for its Traffic tab.
+//   6. Icon: `python3 tool/add_app_icon.py <id> <the app's square icon>`.
+//      It's used in Console and on the right of that app's notifications.
 
 import 'package:flutter/material.dart';
 
 import 'stores_page.dart';
-import 'tickets.dart';
+import 'theme.dart';
 
 /// A switch on an app's Alerts tab. `key` is what the server checks in
-/// dev/notification_prefs/{serviceId}.{key}.
+/// console/alerts.{serviceId}.{key}.
 class ServiceAlert {
   const ServiceAlert(this.key, this.label, this.description, this.icon);
   final String key;
@@ -41,13 +42,14 @@ class ServiceTab {
   final Widget Function(BuildContext context, String developerName) builder;
 }
 
-class OpticService {
-  const OpticService({
+class ConsoleService {
+  const ConsoleService({
     required this.id,
     required this.name,
     required this.tagline,
     required this.icon,
     required this.color,
+    this.website,
     this.projectId,
     this.alerts = const [],
     this.tabs = const [],
@@ -63,10 +65,16 @@ class OpticService {
 
   /// Shown only if the app has no icon file yet (see [iconAsset]).
   final IconData icon;
+
+  /// Only used for the fallback icon and the app's own notifications; the
+  /// Console UI itself is black and white.
   final Color color;
 
+  /// Its website (no https://), shown under the name on the Apps page.
+  final String? website;
+
   /// Its Firebase project: gives it a Traffic tab (Google Analytics and
-  /// function stats, once a Google account is connected in Optic).
+  /// function stats, once a Google account is connected in Console).
   final String? projectId;
 
   /// The app's rounded icon, made with tool/add_app_icon.py.
@@ -78,20 +86,22 @@ class OpticService {
   /// App-specific tabs, shown after Feedback.
   final List<ServiceTab> tabs;
 
-  /// Has a Users tab backed by the app's Optic admin endpoint (optic.js).
+  /// Has a Users tab backed by the app's Console admin endpoint (console.js).
   final bool remoteUsers;
 
   List<ServiceAlert> get allAlerts => [...kFeedbackAlerts, ...alerts];
 }
 
-final kServices = <OpticService>[
-  OpticService(
+final kServices = <ConsoleService>[
+  ConsoleService(
     id: 'axis_team',
     name: 'Axis Team',
     tagline: 'team.axisoptic.com',
+    website: 'team.axisoptic.com',
     icon: Icons.groups_rounded,
     projectId: 'project-attendance-app',
-    color: kRed,
+    color: Color(0xFFFF4C52),
+    remoteUsers: true,
     alerts: const [
       ServiceAlert('new_user', 'New login', 'An Axis Team login is created.', Icons.person_add_alt_1_rounded),
       ServiceAlert('new_store', 'New store', 'A store is added.', Icons.add_business_rounded),
@@ -104,7 +114,7 @@ final kServices = <OpticService>[
       ),
     ],
   ),
-  const OpticService(
+  const ConsoleService(
     id: 'scorecards',
     name: 'Scorecards',
     tagline: 'App + website',
@@ -118,10 +128,11 @@ final kServices = <OpticService>[
   ),
   // Shares project-axis-app with Asset Track and Axis Journal; its Users tab
   // lists only the accounts that have opened Optimizer.
-  const OpticService(
+  const ConsoleService(
     id: 'optimizer',
     name: 'Optimizer',
     tagline: 'optimizer.axisoptic.com',
+    website: 'optimizer.axisoptic.com',
     icon: Icons.bolt_rounded,
     projectId: 'project-axis-app',
     color: Color(0xFF4D6BFF),
@@ -136,7 +147,7 @@ final kServices = <OpticService>[
 /// file is missing).
 class AppIcon extends StatelessWidget {
   const AppIcon(this.service, {super.key, this.size = 40});
-  final OpticService service;
+  final ConsoleService service;
   final double size;
 
   @override
@@ -152,15 +163,15 @@ class AppIcon extends StatelessWidget {
         errorBuilder: (_, _, _) => Container(
           width: size,
           height: size,
-          color: service.color.withValues(alpha: 0.16),
-          child: Icon(service.icon, color: service.color, size: size * 0.55),
+          color: kSurfaceHigh,
+          child: Icon(service.icon, color: kText, size: size * 0.5),
         ),
       ),
     );
   }
 }
 
-OpticService? serviceById(String? id) {
+ConsoleService? serviceById(String? id) {
   for (final s in kServices) {
     if (s.id == id) return s;
   }
@@ -168,7 +179,7 @@ OpticService? serviceById(String? id) {
 }
 
 /// The app a ticket belongs to (by its `app` name).
-OpticService? serviceForApp(String appName) {
+ConsoleService? serviceForApp(String appName) {
   final n = appName.trim().toLowerCase();
   for (final s in kServices) {
     if (s.name.toLowerCase() == n) return s;

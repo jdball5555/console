@@ -1,46 +1,36 @@
 {
   "project_info": {
-    "project_number": "282213766426",
-    "firebase_url": "https://project-attendance-app-default-rtdb.firebaseio.com",
-    "project_id": "project-attendance-app",
-    "storage_bucket": "project-attendance-app.firebasestorage.app"
+    "project_number": "139844049918",
+    "project_id": "axis-optic-ce4f2",
+    "storage_bucket": "axis-optic-ce4f2.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:282213766426:android:b75bdac2b6baaf3c4848a3",
+        "mobilesdk_app_id": "1:139844049918:android:8688b3ba424b1590033eaf",
         "android_client_info": {
-          "package_name": "com.axisoptic.optic"
+          "package_name": "com.axisoptic.console"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "139844049918-pa3nnvbn75j1slasbvgik06o6ho5h50j.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyAwo82eDOdSE2YPBAPGjRfu28HxUf1KRoE"
+          "current_key": "AIzaSyBRTTfb9zAAwVT02v-Dk4tV0EbU_iLNTFo"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:282213766426:android:a44298d501c15e714848a3",
-        "android_client_info": {
-          "package_name": "com.example.axis_ops"
-        }
-      },
-      "oauth_client": [],
-      "api_key": [
-        {
-          "current_key": "AIzaSyAwo82eDOdSE2YPBAPGjRfu28HxUf1KRoE"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "139844049918-pa3nnvbn75j1slasbvgik06o6ho5h50j.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

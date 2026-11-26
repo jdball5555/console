@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/services.dart';
 
+import 'team_firebase.dart';
+
 class StoreTakeoutService {
   static String _escapeCell(dynamic val) {
     if (val == null) return '';
@@ -46,7 +48,7 @@ class StoreTakeoutService {
     required String storeId,
     required String storeName,
   }) async {
-    final db = FirebaseFirestore.instance;
+    final db = teamDb;
 
     // 1. Fetch global config
     final configDoc = await db.collection('stores').doc(storeId).collection('settings').doc('global_config').get();

@@ -1,15 +1,15 @@
 // Data for the app pages: alert switches, the activity feed, and user admin
-// for apps in other Firebase projects (through Axis Team's opticService).
+// for the apps (through Axis Optic's consoleService).
 //
-// Firestore (Axis Team project):
-//   dev/notification_prefs  { <serviceId>: { <alertKey>: bool } }  (missing = on)
-//   dev/activity            { events: [ {id, service, event, title, body, data, at} ] }
+// Firestore (Axis Optic project):
+//   console/alerts    { <serviceId>: { <alertKey>: bool } }  (missing = on)
+//   console/activity  { events: [ {id, service, event, title, body, data, at} ] }
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
-final _prefsRef = FirebaseFirestore.instance.collection('dev').doc('notification_prefs');
-final _activityRef = FirebaseFirestore.instance.collection('dev').doc('activity');
+final _prefsRef = FirebaseFirestore.instance.collection('console').doc('alerts');
+final _activityRef = FirebaseFirestore.instance.collection('console').doc('activity');
 
 // ---------------------------------------------------------------------------
 // Alerts
@@ -63,7 +63,7 @@ Stream<List<ActivityEvent>> activity(String serviceId) => _activityRef.snapshots
 });
 
 // ---------------------------------------------------------------------------
-// Remote user admin (apps with optic.js)
+// Remote user admin (apps with console.js)
 // ---------------------------------------------------------------------------
 
 class ServiceException implements Exception {
@@ -76,13 +76,13 @@ class ServiceException implements Exception {
 Future<Map<String, dynamic>> _call(String serviceId, String action, [Map<String, dynamic> args = const {}]) async {
   try {
     final res = await FirebaseFunctions.instance
-        .httpsCallable('opticService', options: HttpsCallableOptions(timeout: const Duration(seconds: 60)))
+        .httpsCallable('consoleService', options: HttpsCallableOptions(timeout: const Duration(seconds: 60)))
         .call<Object?>({'service': serviceId, 'action': action, ...args});
     final data = res.data;
     return data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
   } on FirebaseFunctionsException catch (e) {
-    if (e.code == 'not-found' && (e.message ?? '').contains('opticService')) {
-      throw const ServiceException('The Optic hub isn\'t deployed yet (opticService).');
+    if (e.code == 'not-found' && (e.message ?? '').contains('consoleService')) {
+      throw const ServiceException('Axis Optic\'s functions aren\'t deployed yet (consoleService).');
     }
     throw ServiceException(e.message ?? e.code);
   } catch (e) {

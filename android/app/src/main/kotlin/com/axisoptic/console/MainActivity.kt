@@ -1,4 +1,4 @@
-package com.axisoptic.optic
+package com.axisoptic.console
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -17,7 +17,7 @@ class MainActivity : FlutterActivity() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channelId = "optic_feedback_channel"
+            val channelId = "console_alerts"
             val channelName = "Feedback Tickets"
             val channelDescription = "Notifications for new feedback tickets and replies"
             val importance = NotificationManager.IMPORTANCE_HIGH

@@ -1,9 +1,12 @@
 // Feedback tickets from the Axis apps.
 //
-// Firestore: users/{uid}/feedback/{ticketId}
+// Firestore (Axis Optic): tickets/{ticketId}, written by the `feedback`
+// function when someone sends feedback from an app.
+//   service: the app's id in services.dart, app: its display name
 //   type: "Bug" | "Improvement"
-//   message, submitted_by (uid), store_id, timestamp
-//   submitter_name, submitter_email, store_name     (newer tickets)
+//   location, message, timestamp
+//   submitted_by (their uid in that app's project), submitter_name,
+//   submitter_email, store_id, store_name (Axis Team)
 //   status: "Open"      waiting on a developer
 //           "Closed"    a developer closed it; waiting for the sender
 //           "Resolved"  the sender agreed it's done
@@ -13,10 +16,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-const kRed = Color(0xFFFF4C52);
-const kBlue = Color(0xFF4C8DFF);
-const kGreen = Color(0xFF4CC38A);
-const kAmber = Color(0xFFF5B83D);
+import 'team_firebase.dart';
 
 class Reply {
   const Reply({required this.fromDeveloper, required this.name, required this.text, this.at});
@@ -41,12 +41,11 @@ class Ticket {
   DocumentReference<Map<String, dynamic>> get ref => doc.reference;
   String get id => doc.id;
 
-  /// The uid of the person who sent it (the users/{uid} parent).
-  String get userId => _d['submitted_by'] as String? ?? doc.reference.parent.parent?.id ?? '';
+  /// The uid of the person who sent it, in their app's project.
+  String get userId => _d['submitted_by'] as String? ?? _d['source_uid'] as String? ?? '';
 
   bool get isBug => (_d['type'] as String? ?? '') == 'Bug';
-  Color get color => isBug ? kRed : kBlue;
-  IconData get icon => isBug ? Icons.bug_report_rounded : Icons.lightbulb_rounded;
+  IconData get icon => isBug ? Icons.bug_report_outlined : Icons.lightbulb_outline_rounded;
   String get typeLabel => isBug ? 'Bug' : 'Improvement';
 
   /// What app or website this feedback is for (defaults to "Axis Team").
@@ -99,17 +98,18 @@ int compareTickets(Ticket a, Ticket b) {
   return a.id.compareTo(b.id);
 }
 
-/// Every ticket from every Axis Team login.
+/// Every ticket from every Axis app.
 Stream<List<Ticket>> allTickets() => FirebaseFirestore.instance
-    .collectionGroup('feedback')
+    .collection('tickets')
     .snapshots()
     .map((s) => [for (final d in s.docs) Ticket(d)]..sort(compareTickets));
 
-/// Name / email of a sender from their login (for older tickets).
+/// Name / email of an Axis Team sender from their login (for older tickets
+/// without submitter_name / submitter_email).
 Future<Map<String, dynamic>?> senderProfile(String uid) async {
   if (uid.isEmpty) return null;
   try {
-    final d = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final d = await teamDb.collection('users').doc(uid).get();
     return d.data();
   } catch (_) {
     return null;

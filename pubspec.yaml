@@ -1,7 +1,7 @@
-name: optic
-description: "Optic: Axis Optic's developer app (feedback tickets from the Axis apps)."
+name: console
+description: "Console: Axis Optic's developer app (feedback, alerts and user admin for the Axis apps)."
 publish_to: 'none'
-version: 0.1.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.10.3

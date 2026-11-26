@@ -6,10 +6,8 @@ import 'package:flutter/material.dart';
 
 import 'google_data.dart';
 import 'services.dart';
-import 'tickets.dart';
+import 'theme.dart';
 
-const _kCard = Color(0xFF17171C);
-const _kBorder = Color(0xFF26262E);
 
 String _count(int n) {
   if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(n >= 10000000 ? 0 : 1)}M';
@@ -18,7 +16,7 @@ String _count(int n) {
   return '$n';
 }
 
-OpticService? _serviceForProject(String projectId) {
+ConsoleService? _serviceForProject(String projectId) {
   for (final s in kServices) {
     if (s.projectId == projectId) return s;
   }
@@ -55,7 +53,7 @@ class GoogleAccountButton extends StatelessWidget {
   static void _sheet(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: _kCard,
+      backgroundColor: kSurface,
       builder: (context) => ListenableBuilder(
         listenable: GoogleData.instance,
         builder: (context, _) {
@@ -67,17 +65,17 @@ class GoogleAccountButton extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text('Google account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                  const Text('Google account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
                   Text(
                     g.connected
-                        ? 'Connected as ${g.account!.email}. Optic can read your Firebase projects, their Analytics traffic and their function stats. It can\'t change anything.'
+                        ? 'Connected as ${g.account!.email}. Console can read your Firebase projects, their Analytics traffic and their function stats. It can\'t change anything.'
                         : 'Connect the Google account that owns your Firebase projects to see every project, its traffic and its function stats here. Read-only.',
-                    style: const TextStyle(color: Colors.white60),
+                    style: const TextStyle(color: kTextDim),
                   ),
                   if (g.error != null) ...[
                     const SizedBox(height: 10),
-                    Text(g.error!, style: const TextStyle(color: kRed)),
+                    Text(g.error!, style: const TextStyle(color: kDanger)),
                   ],
                   const SizedBox(height: 16),
                   if (g.connected) ...[
@@ -119,19 +117,19 @@ class _ConnectCard extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(Icons.insights_rounded, color: Colors.white70),
+              Icon(Icons.insights_rounded, color: kTextDim),
               SizedBox(width: 10),
-              Text('See traffic and function stats', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+              Text('See traffic and function stats', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
             ],
           ),
           const SizedBox(height: 8),
           const Text(
-            'Connect the Google account that owns your Firebase projects. Optic only reads; it can\'t change anything.',
-            style: TextStyle(color: Colors.white60),
+            'Connect the Google account that owns your Firebase projects. Console only reads; it can\'t change anything.',
+            style: TextStyle(color: kTextDim),
           ),
           if (g.error != null) ...[
             const SizedBox(height: 10),
-            Text(g.error!, style: const TextStyle(color: kRed)),
+            Text(g.error!, style: const TextStyle(color: kDanger)),
           ],
           const SizedBox(height: 14),
           FilledButton.icon(
@@ -162,7 +160,7 @@ class _FirebaseProjectsPageState extends State<FirebaseProjectsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Firebase projects', style: TextStyle(fontWeight: FontWeight.w800))),
+      appBar: AppBar(title: const Text('Firebase projects', style: TextStyle(fontWeight: FontWeight.w600))),
       body: RefreshIndicator(
         onRefresh: () async {
           setState(() => _projects = GoogleData.instance.projects());
@@ -196,14 +194,14 @@ class _FirebaseProjectsPageState extends State<FirebaseProjectsPage> {
                               color: Colors.white.withValues(alpha: 0.06),
                               borderRadius: BorderRadius.circular(9),
                             ),
-                            child: const Icon(Icons.local_fire_department_rounded, color: Color(0xFFFFA000)),
+                            child: const Icon(Icons.local_fire_department_outlined, color: kTextDim),
                           ),
                     title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w700)),
                     subtitle: Text(
                       service != null && service.name != p.name ? '${p.id} · ${service.name}' : p.id,
-                      style: const TextStyle(color: Colors.white54, fontSize: 12.5),
+                      style: const TextStyle(color: kTextFaint, fontSize: 12.5),
                     ),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: Colors.white38),
+                    trailing: const Icon(Icons.chevron_right_rounded, color: kTextFaint),
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => Scaffold(
@@ -212,11 +210,11 @@ class _FirebaseProjectsPageState extends State<FirebaseProjectsPage> {
                             title: Row(
                               children: [
                                 if (service != null) ...[AppIcon(service, size: 30), const SizedBox(width: 10)],
-                                Flexible(child: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w800))),
+                                Flexible(child: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600))),
                               ],
                             ),
                           ),
-                          body: ProjectStatsView(projectId: p.id, color: service?.color),
+                          body: ProjectStatsView(projectId: p.id),
                         ),
                       ),
                     ),
@@ -278,7 +276,7 @@ class _ProjectStatsViewState extends State<ProjectStatsView> {
 
   @override
   Widget build(BuildContext context) {
-    final color = widget.color ?? kBlue;
+    final color = widget.color ?? kText;
     final stats = _stats;
     return RefreshIndicator(
       onRefresh: () async {
@@ -309,7 +307,7 @@ class _ProjectStatsViewState extends State<ProjectStatsView> {
                     Row(
                       children: [
                         const Expanded(
-                          child: Text('TRAFFIC', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                          child: Text('TRAFFIC', style: TextStyle(color: kTextFaint, fontWeight: FontWeight.w600, letterSpacing: 1)),
                         ),
                         SegmentedButton<int>(
                           showSelectedIcon: false,
@@ -335,11 +333,11 @@ class _ProjectStatsViewState extends State<ProjectStatsView> {
                           'Google Analytics isn\'t on for this project, so there\'s no traffic yet. '
                           'Turn it on in the Firebase console (Project settings → Integrations → Google Analytics), '
                           'then add Analytics to the app.',
-                          style: TextStyle(color: Colors.white60),
+                          style: TextStyle(color: kTextDim),
                         ),
                       ),
                     const SizedBox(height: 22),
-                    const Text('FUNCTIONS', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                    const Text('FUNCTIONS', style: TextStyle(color: kTextFaint, fontWeight: FontWeight.w600, letterSpacing: 1)),
                     const SizedBox(height: 10),
                     switch (s.health) {
                       final FunctionHealth h => Row(
@@ -350,7 +348,7 @@ class _ProjectStatsViewState extends State<ProjectStatsView> {
                             child: _Stat(
                               label: 'Failed · ${h.hours}h',
                               value: _count(h.failed),
-                              color: h.failed > 0 ? kRed : null,
+                              color: h.failed > 0 ? kDanger : null,
                             ),
                           ),
                         ],
@@ -389,7 +387,7 @@ class _ProjectStatsViewState extends State<ProjectStatsView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Page views per day', style: TextStyle(color: Colors.white60, fontSize: 13)),
+            const Text('Page views per day', style: TextStyle(color: kTextDim, fontSize: 13)),
             const SizedBox(height: 12),
             SizedBox(
               height: 90,
@@ -416,9 +414,9 @@ class _ProjectStatsViewState extends State<ProjectStatsView> {
             const SizedBox(height: 6),
             Row(
               children: [
-                Text(_short(t.daily.first.day), style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                Text(_short(t.daily.first.day), style: const TextStyle(color: kTextFaint, fontSize: 11)),
                 const Spacer(),
-                const Text('Today', style: TextStyle(color: Colors.white38, fontSize: 11)),
+                const Text('Today', style: TextStyle(color: kTextFaint, fontSize: 11)),
               ],
             ),
           ],
@@ -432,15 +430,15 @@ class _ProjectStatsViewState extends State<ProjectStatsView> {
           children: [
             const Row(
               children: [
-                Expanded(child: Text('Top pages', style: TextStyle(color: Colors.white60, fontSize: 13))),
-                Text('Views', style: TextStyle(color: Colors.white38, fontSize: 12)),
+                Expanded(child: Text('Top pages', style: TextStyle(color: kTextDim, fontSize: 13))),
+                Text('Views', style: TextStyle(color: kTextFaint, fontSize: 12)),
               ],
             ),
             const SizedBox(height: 6),
             if (t.pages.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 10),
-                child: Text('No page views yet.', style: TextStyle(color: Colors.white38)),
+                child: Text('No page views yet.', style: TextStyle(color: kTextFaint)),
               ),
             for (final p in t.pages)
               Padding(
@@ -456,7 +454,7 @@ class _ProjectStatsViewState extends State<ProjectStatsView> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    Text(_count(p.views), style: const TextStyle(fontWeight: FontWeight.w800)),
+                    Text(_count(p.views), style: const TextStyle(fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
@@ -492,9 +490,9 @@ class _Stat extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Colors.white60, fontSize: 13)),
+          Text(label, style: const TextStyle(color: kTextDim, fontSize: 13)),
           const SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: color)),
+          Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300, letterSpacing: -0.6, color: color)),
         ],
       ),
     );
@@ -511,9 +509,9 @@ class _Panel extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: _kCard,
+        color: kSurface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kBorder),
+        border: Border.all(color: kLine),
       ),
       child: child,
     );
@@ -534,9 +532,9 @@ class _ErrorPanel extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.error_outline_rounded, color: kRed),
+          const Icon(Icons.error_outline_rounded, color: kDanger),
           const SizedBox(width: 10),
-          Expanded(child: Text(text, style: const TextStyle(color: Colors.white70))),
+          Expanded(child: Text(text, style: const TextStyle(color: kTextDim))),
         ],
       ),
     );
